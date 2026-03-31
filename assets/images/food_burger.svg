@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF7ED"/>
+      <stop offset="1" stop-color="#F0FDFA"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="480" rx="32" fill="url(#bg)"/>
+  <!-- bun top -->
+  <path d="M240 210c0-70 70-120 160-120s160 50 160 120H240z" fill="#F59E0B"/>
+  <g fill="#FCD34D" opacity="0.9">
+    <circle cx="330" cy="150" r="9"/>
+    <circle cx="380" cy="130" r="8"/>
+    <circle cx="440" cy="145" r="9"/>
+    <circle cx="495" cy="165" r="8"/>
+  </g>
+  <!-- lettuce -->
+  <path d="M260 225c40 18 60-10 95 8 28 14 55-12 88 0 35 13 55 6 99-8v28H260z" fill="#22C55E"/>
+  <!-- patty -->
+  <rect x="275" y="255" width="250" height="44" rx="22" fill="#7C2D12"/>
+  <!-- cheese -->
+  <path d="M290 240h220v30c-25 10-55 6-70 22-18 20-45 18-68 0-18-14-52-12-82-22v-52z" fill="#FDE68A" opacity="0.95"/>
+  <!-- bun bottom -->
+  <path d="M260 310h280c0 55-65 95-140 95S260 365 260 310z" fill="#F59E0B"/>
+  <rect x="40" y="36" rx="18" ry="18" width="230" height="56" fill="#111827" opacity="0.88"/>
+  <text x="62" y="74" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#FFFFFF" font-weight="700">Burger</text>
+</svg>
+

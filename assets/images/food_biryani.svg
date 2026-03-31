@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF0E6"/>
+      <stop offset="1" stop-color="#FFE7F5"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F5F7FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="480" rx="32" fill="url(#bg)"/>
+  <circle cx="400" cy="270" r="150" fill="url(#plate)" stroke="#E5E7EB" stroke-width="10"/>
+  <circle cx="400" cy="270" r="105" fill="#FFF7ED" stroke="#FDE68A" stroke-width="8"/>
+  <!-- rice -->
+  <g fill="#F59E0B" opacity="0.9">
+    <circle cx="355" cy="250" r="10"/>
+    <circle cx="385" cy="235" r="9"/>
+    <circle cx="420" cy="245" r="10"/>
+    <circle cx="450" cy="265" r="9"/>
+    <circle cx="430" cy="290" r="10"/>
+    <circle cx="390" cy="295" r="9"/>
+    <circle cx="360" cy="285" r="10"/>
+  </g>
+  <g fill="#EF4444" opacity="0.85">
+    <circle cx="410" cy="270" r="9"/>
+    <circle cx="375" cy="265" r="7"/>
+    <circle cx="445" cy="290" r="8"/>
+  </g>
+  <!-- garnish -->
+  <path d="M320 305c25-38 55-55 80-35 23 18 52 10 80-25" fill="none" stroke="#22C55E" stroke-width="10" stroke-linecap="round"/>
+  <!-- label -->
+  <rect x="40" y="36" rx="18" ry="18" width="240" height="56" fill="#111827" opacity="0.88"/>
+  <text x="62" y="74" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#FFFFFF" font-weight="700">Biryani</text>
+</svg>
+
