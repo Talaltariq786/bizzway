@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/business.dart';
 import '../../providers/appointment_provider.dart';
+import '../../widgets/common/themed_dialog_wrapper.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -19,6 +20,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -33,49 +35,163 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Colors.white,
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-        ),
-        title: const Text('My Bookings'),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1A3A5C), Color(0xFF0D7377)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: AppColors.gradientPrimary,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                ),
+              ),
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 12,
+                left: 20,
+                right: 20,
+                bottom: 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'My Bookings',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Manage your appointments and reservations',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        bottom: TabBar(
-          controller: _tabCtrl,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          dividerColor: Colors.transparent,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: [
-            Tab(text: 'All (${prov.bookings.length})'),
-            Tab(text: 'Pending (${prov.pendingBookings.length})'),
-            Tab(text: 'Confirmed (${prov.confirmedBookings.length})'),
-            Tab(text: 'Done (${prov.completedBookings.length})'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabCtrl,
-        children: [
-          _BookingList(bookings: prov.bookings.toList()),
-          _BookingList(bookings: prov.pendingBookings),
-          _BookingList(bookings: prov.confirmedBookings),
-          _BookingList(bookings: prov.completedBookings),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.all(Radius.circular(20)),
+                  gradient: LinearGradient(
+                    colors: AppColors.gradientPrimary,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: List.generate(4, (index) {
+                      final isSelected = _tabCtrl.index == index;
+                      final counts = [
+                        prov.bookings.length,
+                        prov.pendingBookings.length,
+                        prov.confirmedBookings.length,
+                        prov.completedBookings.length,
+                      ];
+                      final labels = ['All', 'Pending', 'Confirmed', 'Done'];
+
+                      return GestureDetector(
+                        onTap: () => _tabCtrl.animateTo(index),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                labels[index],
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                ),
+                              ),
+                              if (counts[index] > 0) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE91E3F),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${counts[index]}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SliverFillRemaining(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, left: 12, right: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: TabBarView(
+                controller: _tabCtrl,
+                children: [
+                  _BookingList(bookings: prov.bookings.toList()),
+                  _BookingList(bookings: prov.pendingBookings),
+                  _BookingList(bookings: prov.confirmedBookings),
+                  _BookingList(bookings: prov.completedBookings),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -95,14 +211,20 @@ class _BookingList extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.calendar_month_outlined,
-                size: 56, color: AppColors.textHint),
+            Icon(
+              Icons.calendar_month_outlined,
+              size: 56,
+              color: AppColors.textHint,
+            ),
             SizedBox(height: 12),
-            Text('Koi booking nahi',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+            Text(
+              'Koi booking nahi',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
       );
@@ -174,16 +296,24 @@ class _BookingCard extends StatelessWidget {
 
   String _fmtDate(DateTime dt) {
     const m = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${dt.day} ${m[dt.month - 1]} ${dt.year}';
   }
 
   String _fmtTime(DateTime dt) {
-    final h = dt.hour > 12
-        ? dt.hour - 12
-        : (dt.hour == 0 ? 12 : dt.hour);
+    final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
     final period = dt.hour >= 12 ? 'PM' : 'AM';
     final min = dt.minute.toString().padLeft(2, '0');
     return '$h:$min $period';
@@ -222,8 +352,9 @@ class _BookingCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: bizColor.withValues(alpha: 0.08),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
             ),
             child: Row(
               children: [
@@ -244,15 +375,17 @@ class _BookingCard extends StatelessWidget {
                       Text(
                         booking.businessName,
                         style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: AppColors.textPrimary),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       Text(
                         booking.itemName,
                         style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary),
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -260,13 +393,16 @@ class _BookingCard extends StatelessWidget {
                 // Status badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 9, vertical: 4),
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: statusColor.withValues(alpha: 0.3),
-                        width: 1),
+                      color: statusColor.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -276,9 +412,10 @@ class _BookingCard extends StatelessWidget {
                       Text(
                         statusLabel,
                         style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: statusColor),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
                       ),
                     ],
                   ),
@@ -298,10 +435,10 @@ class _BookingCard extends StatelessWidget {
                   booking.status == 'pending'
                       ? Icons.info_outline_rounded
                       : booking.status == 'confirmed'
-                          ? Icons.verified_rounded
-                          : booking.status == 'completed'
-                              ? Icons.check_circle_outline_rounded
-                              : Icons.cancel_outlined,
+                      ? Icons.verified_rounded
+                      : booking.status == 'completed'
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.cancel_outlined,
                   size: 14,
                   color: statusColor,
                 ),
@@ -309,9 +446,10 @@ class _BookingCard extends StatelessWidget {
                 Text(
                   statusDesc,
                   style: TextStyle(
-                      fontSize: 12,
-                      color: statusColor,
-                      fontWeight: FontWeight.w500),
+                    fontSize: 12,
+                    color: statusColor,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -324,24 +462,33 @@ class _BookingCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _chip(Icons.calendar_today_outlined,
-                        _fmtDate(booking.dateTime), AppColors.textSecondary),
+                    _chip(
+                      Icons.calendar_today_outlined,
+                      _fmtDate(booking.dateTime),
+                      AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 10),
-                    _chip(Icons.access_time_rounded,
-                        _fmtTime(booking.dateTime), AppColors.textSecondary),
+                    _chip(
+                      Icons.access_time_rounded,
+                      _fmtTime(booking.dateTime),
+                      AppColors.textSecondary,
+                    ),
                     if (booking.durationMinutes != null) ...[
                       const SizedBox(width: 10),
-                      _chip(Icons.timer_outlined,
-                          '${booking.durationMinutes} min',
-                          AppColors.textSecondary),
+                      _chip(
+                        Icons.timer_outlined,
+                        '${booking.durationMinutes} min',
+                        AppColors.textSecondary,
+                      ),
                     ],
                     const Spacer(),
                     Text(
                       'Rs. ${booking.price.toStringAsFixed(0)}',
                       style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          color: bizColor),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: bizColor,
+                      ),
                     ),
                   ],
                 ),
@@ -349,15 +496,19 @@ class _BookingCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.notes_rounded,
-                          size: 13, color: AppColors.textHint),
+                      const Icon(
+                        Icons.notes_rounded,
+                        size: 13,
+                        color: AppColors.textHint,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           booking.notes!,
                           style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary),
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -381,21 +532,19 @@ class _BookingCard extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: () =>
                             _showRescheduleSheet(context, bizColor),
-                        icon: const Icon(Icons.edit_calendar_rounded,
-                            size: 16),
+                        icon: const Icon(Icons.edit_calendar_rounded, size: 16),
                         label: const Text('Reschedule'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: bizColor,
                           side: BorderSide(color: bizColor),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
-                  if (_canReschedule && _canCancel)
-                    const SizedBox(width: 10),
+                  if (_canReschedule && _canCancel) const SizedBox(width: 10),
                   if (_canCancel)
                     Expanded(
                       child: OutlinedButton.icon(
@@ -405,10 +554,10 @@ class _BookingCard extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.error,
                           side: const BorderSide(color: AppColors.error),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
@@ -423,41 +572,46 @@ class _BookingCard extends StatelessWidget {
   }
 
   Widget _chip(IconData icon, String label, Color color) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(fontSize: 12, color: color)),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 13, color: color),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 12, color: color)),
+    ],
+  );
 
   void _confirmCancel(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cancel Booking?'),
-        content: Text(
-            '${booking.itemName} ki booking cancel karna chahte hain?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Nahi')),
-          ElevatedButton(
-            onPressed: () {
-              context
-                  .read<AppointmentProvider>()
-                  .cancelBooking(booking.id);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white),
-            child: const Text('Haan, Cancel'),
+      builder: (_) => wrapDialogWithTheme(
+        context,
+        accentColor: _bizColor,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
+          title: const Text('Cancel Booking?'),
+          content: Text(
+            '${booking.itemName} ki booking cancel karna chahte hain?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Nahi'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                context.read<AppointmentProvider>().cancelBooking(booking.id);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Haan, Cancel'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -467,10 +621,7 @@ class _BookingCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _RescheduleSheet(
-        booking: booking,
-        bizColor: bizColor,
-      ),
+      builder: (_) => _RescheduleSheet(booking: booking, bizColor: bizColor),
     );
   }
 }
@@ -480,8 +631,7 @@ class _BookingCard extends StatelessWidget {
 class _RescheduleSheet extends StatefulWidget {
   final CustomerBooking booking;
   final Color bizColor;
-  const _RescheduleSheet(
-      {required this.booking, required this.bizColor});
+  const _RescheduleSheet({required this.booking, required this.bizColor});
 
   @override
   State<_RescheduleSheet> createState() => _RescheduleSheetState();
@@ -492,11 +642,25 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
   String? _selectedTime;
 
   final List<String> _timeSlots = [
-    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
-    '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
-    '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
-    '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
-    '05:00 PM', '05:30 PM', '06:00 PM',
+    '09:00 AM',
+    '09:30 AM',
+    '10:00 AM',
+    '10:30 AM',
+    '11:00 AM',
+    '11:30 AM',
+    '12:00 PM',
+    '12:30 PM',
+    '01:00 PM',
+    '01:30 PM',
+    '02:00 PM',
+    '02:30 PM',
+    '03:00 PM',
+    '03:30 PM',
+    '04:00 PM',
+    '04:30 PM',
+    '05:00 PM',
+    '05:30 PM',
+    '06:00 PM',
   ];
 
   // Simulate some already-booked slots
@@ -518,11 +682,13 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
 
   void _confirm() {
     if (_selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Pehle time slot select karen'),
-        backgroundColor: AppColors.warning,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pehle time slot select karen'),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -534,26 +700,35 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
     if (parts[1] == 'AM' && h == 12) h = 0;
 
     final newDt = DateTime(
-        _selectedDate.year, _selectedDate.month, _selectedDate.day, h, min);
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      h,
+      min,
+    );
 
-    context
-        .read<AppointmentProvider>()
-        .rescheduleBooking(widget.booking.id, newDt);
+    context.read<AppointmentProvider>().rescheduleBooking(
+      widget.booking.id,
+      newDt,
+    );
 
     Navigator.pop(context);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(children: [
-          Icon(Icons.check_circle_rounded, color: Colors.white),
-          SizedBox(width: 10),
-          Text('Booking reschedule ho gayi — vendor ko notify kar diya',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-        ]),
+        content: const Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white),
+            SizedBox(width: 10),
+            Text(
+              'Booking reschedule ho gayi — vendor ko notify kar diya',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
         backgroundColor: widget.bizColor,
         behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -562,8 +737,18 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
   Widget build(BuildContext context) {
     final color = widget.bizColor;
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
 
     return Container(
@@ -575,7 +760,8 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
         left: 20,
         right: 20,
         top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom +
+        bottom:
+            MediaQuery.of(context).viewInsets.bottom +
             MediaQuery.of(context).padding.bottom +
             20,
       ),
@@ -590,51 +776,57 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             const SizedBox(height: 16),
 
             // Header
-            Row(children: [
-              Icon(Icons.edit_calendar_rounded, color: color, size: 22),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Reschedule: ${widget.booking.itemName}',
-                  style: const TextStyle(
+            Row(
+              children: [
+                Icon(Icons.edit_calendar_rounded, color: color, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Reschedule: ${widget.booking.itemName}',
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: AppColors.textPrimary),
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
             const SizedBox(height: 4),
             const Text(
               'Nai date aur time select karen',
-              style: TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
 
             // Date picker
-            const Text('Date chunein',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary)),
+            const Text(
+              'Date chunein',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 10),
             SizedBox(
               height: 72,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: _next7Days.map((date) {
-                  final sel = date.day == _selectedDate.day &&
+                  final sel =
+                      date.day == _selectedDate.day &&
                       date.month == _selectedDate.month;
                   return GestureDetector(
-                    onTap: () =>
-                        setState(() => _selectedDate = date),
+                    onTap: () => setState(() => _selectedDate = date),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       width: 54,
@@ -643,8 +835,8 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                         color: sel ? color : AppColors.backgroundLight,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                            color:
-                                sel ? color : AppColors.border),
+                          color: sel ? color : AppColors.border,
+                        ),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -652,29 +844,30 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                           Text(
                             _dayName(date),
                             style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: sel
-                                    ? Colors.white
-                                    : AppColors.textSecondary),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: sel
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '${date.day}',
                             style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: sel
-                                    ? Colors.white
-                                    : AppColors.textPrimary),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: sel ? Colors.white : AppColors.textPrimary,
+                            ),
                           ),
                           Text(
                             months[date.month - 1],
                             style: TextStyle(
-                                fontSize: 10,
-                                color: sel
-                                    ? Colors.white.withValues(alpha: 0.85)
-                                    : AppColors.textHint),
+                              fontSize: 10,
+                              color: sel
+                                  ? Colors.white.withValues(alpha: 0.85)
+                                  : AppColors.textHint,
+                            ),
                           ),
                         ],
                       ),
@@ -686,42 +879,58 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
             const SizedBox(height: 20),
 
             // Time slots
-            const Text('Time chunein',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary)),
+            const Text(
+              'Time chunein',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 4),
-            Row(children: [
-              Container(
+            Row(
+              children: [
+                Container(
                   width: 10,
                   height: 10,
                   decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.2),
-                      shape: BoxShape.circle)),
-              const SizedBox(width: 5),
-              const Text('Available',
+                    color: color.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'Available',
                   style: TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary)),
-              const SizedBox(width: 14),
-              Container(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Container(
                   width: 10,
                   height: 10,
                   decoration: const BoxDecoration(
-                      color: AppColors.backgroundLight,
-                      shape: BoxShape.circle)),
-              const SizedBox(width: 5),
-              const Text('Booked',
+                    color: AppColors.backgroundLight,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'Booked',
                   style: TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary)),
-            ]),
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 10),
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _timeSlots.length,
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 4,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
@@ -742,15 +951,15 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                       color: booked
                           ? AppColors.backgroundLight
                           : sel
-                              ? color
-                              : color.withValues(alpha: 0.08),
+                          ? color
+                          : color.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: booked
                             ? AppColors.border
                             : sel
-                                ? color
-                                : color.withValues(alpha: 0.25),
+                            ? color
+                            : color.withValues(alpha: 0.25),
                       ),
                     ),
                     child: Text(
@@ -761,8 +970,8 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                         color: booked
                             ? AppColors.textHint
                             : sel
-                                ? Colors.white
-                                : color,
+                            ? Colors.white
+                            : color,
                       ),
                     ),
                   ),
@@ -787,7 +996,8 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),

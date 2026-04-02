@@ -10,13 +10,20 @@ import '../../providers/job_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
+import '../../models/order.dart';
+import '../../models/job_request.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import '../../widgets/dashboard/dashboard_stat_card.dart';
 import '../../widgets/orders/order_card.dart';
+import '../../widgets/common/animated_page_transition.dart';
 import '../customers/customers_screen.dart';
 import '../orders/orders_screen.dart';
 import '../products/products_screen.dart';
 import '../profile/profile_screen.dart';
 import '../service_worker/job_request_detail_screen.dart';
+import '../gym/gym_owner_console_screen.dart';
+
+enum _SalesRange { daily, weekly, monthly, yearly }
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -28,17 +35,23 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
-  void switchTab(int index) => setState(() => _selectedIndex = index);
+  void switchTab(int index) {
+    setState(() => _selectedIndex = index);
+  }
 
   @override
   Widget build(BuildContext context) {
     final notifCount = context.watch<NotificationProvider>().unreadCount;
     final business = context.watch<BusinessProvider>();
-    final isServiceBiz =
-        ['salon', 'gym', 'clinic'].contains(business.selectedBusiness?.id);
+    final themeColor = business.themeColor;
+    final isServiceBiz = [
+      'salon',
+      'gym',
+      'clinic',
+    ].contains(business.selectedBusiness?.id);
 
     return Scaffold(
-      body: IndexedStack(
+      body: AnimatedPageTransition(
         index: _selectedIndex,
         children: [
           _DashboardHome(onSwitchTab: switchTab),
@@ -48,36 +61,111 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const ProfileScreen(),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+      bottomNavigationBar: CurvedNavigationBar(
+        index: _selectedIndex,
+        height: 75,
         items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.dashboard_outlined, size: 24, color: Colors.white),
+              if (_selectedIndex != 0) ...[
+                const SizedBox(height: 2),
+                const Text(
+                  'Dashboard',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.receipt_long_outlined),
-            activeIcon: const Icon(Icons.receipt_long),
-            label: isServiceBiz ? 'Bookings' : 'Orders',
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isServiceBiz
+                    ? Icons.event_note_outlined
+                    : Icons.receipt_long_outlined,
+                size: 24,
+                color: Colors.white,
+              ),
+              if (_selectedIndex != 1) ...[
+                const SizedBox(height: 2),
+                Text(
+                  isServiceBiz ? 'Bookings' : 'Orders',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.inventory_2_outlined),
-            activeIcon: const Icon(Icons.inventory_2),
-            label: isServiceBiz ? 'Services' : 'Products',
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isServiceBiz ? Icons.spa_outlined : Icons.inventory_2_outlined,
+                size: 24,
+                color: Colors.white,
+              ),
+              if (_selectedIndex != 2) ...[
+                const SizedBox(height: 2),
+                Text(
+                  isServiceBiz ? 'Services' : 'Products',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
-            label: 'Customers',
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outline, size: 24, color: Colors.white),
+              if (_selectedIndex != 3) ...[
+                const SizedBox(height: 2),
+                const Text(
+                  'Customers',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_outline, size: 24, color: Colors.white),
+              if (_selectedIndex != 4) ...[
+                const SizedBox(height: 2),
+                const Text(
+                  'Profile',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
+        onTap: switchTab,
+        backgroundColor: Colors.transparent,
+        color: themeColor,
+        animationDuration: const Duration(milliseconds: 400),
+        animationCurve: Curves.easeInOut,
       ),
       floatingActionButton: _selectedIndex == 0
           ? Stack(
@@ -87,9 +175,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   heroTag: 'notif-fab',
                   onPressed: () =>
                       Navigator.pushNamed(context, AppRoutes.notifications),
-                  backgroundColor: AppColors.primary,
-                  child: const Icon(Icons.notifications_outlined,
-                      color: Colors.white),
+                  backgroundColor: themeColor,
+                  child: const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                  ),
                 ),
                 if (notifCount > 0)
                   Positioned(
@@ -134,65 +224,84 @@ class _DashboardHome extends StatelessWidget {
     final isServiceBiz = ['salon', 'gym', 'clinic'].contains(bizId);
     final isFoodBiz = ['restaurant', 'cafe'].contains(bizId);
     final isNearMeType = business.isNearMeType;
-    final scopedOrders =
-        orders.orders.where((o) => o.businessTypeId == bizId).toList();
-    final scopedPending =
-        orders.pendingOrders.where((o) => o.businessTypeId == bizId).toList();
-    final scopedRevenue = scopedOrders.fold<double>(
-      0,
-      (sum, o) =>
-          sum +
-          o.items.fold<double>(
-            0,
-            (s, i) => s + (i.unitPrice * i.quantity),
-          ) +
-          o.deliveryCharge,
-    );
+    final scopedJobs = jobs.requestsForBusiness(bizId);
+    final scopedOrders = orders.orders
+        .where((o) => o.businessTypeId == bizId)
+        .toList();
+    final scopedPending = orders.pendingOrders
+        .where((o) => o.businessTypeId == bizId)
+        .toList();
     final scopedProducts = products.productsForBusiness(bizId);
+    final headerGradient = AppColors.gradientFrom(business.themeColor);
 
     return CustomScrollView(
       slivers: [
-        SliverAppBar(
-          floating: true,
-          backgroundColor: AppColors.surface,
-          automaticallyImplyLeading: false,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hello, Boss! 👋',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: AppColors.textHint),
+        SliverToBoxAdapter(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: headerGradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              Text(
-                business.businessName,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
-          actions: [
-            GestureDetector(
-              onTap: () => onSwitchTab(4),
-              child: Container(
-                margin: const EdgeInsets.only(right: 16),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: AppColors.gradientPrimary,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  business.selectedBusiness?.icon ?? Icons.store,
-                  color: Colors.white,
-                  size: 20,
-                ),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(28),
+                bottomRight: Radius.circular(28),
               ),
             ),
-          ],
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              left: 20,
+              right: 20,
+              bottom: 16,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        business.businessName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => onSwitchTab(4),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      business.selectedBusiness?.icon ?? Icons.store,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         SliverToBoxAdapter(
           child: Padding(
@@ -203,8 +312,13 @@ class _DashboardHome extends StatelessWidget {
                 if (isNearMeType) ...[
                   _buildOnlineToggle(context, business),
                   const SizedBox(height: 12),
-                  if (jobs.all.isNotEmpty)
-                    _buildJobRequests(context, jobs, business.themeColor),
+                  if (scopedJobs.isNotEmpty)
+                    _buildJobRequests(
+                      context,
+                      scopedJobs,
+                      jobs,
+                      business.themeColor,
+                    ),
                   const SizedBox(height: 12),
                 ],
                 _buildBusinessVisualHeader(
@@ -214,7 +328,12 @@ class _DashboardHome extends StatelessWidget {
                   themeColor: business.themeColor,
                 ),
                 const SizedBox(height: 14),
-                _buildRevenueCard(context, scopedRevenue),
+                _buildRevenueCard(
+                  context,
+                  scopedOrders,
+                  isServiceBiz,
+                  business.themeColor,
+                ),
                 const SizedBox(height: 16),
                 GridView.count(
                   shrinkWrap: true,
@@ -257,6 +376,64 @@ class _DashboardHome extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
+                if (bizId == 'gym')
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Material(
+                      color: business.themeColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const GymOwnerConsoleScreen(),
+                          ),
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.badge_outlined,
+                                color: business.themeColor,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Gym desk',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Online admissions — cash accept karke membership start karein',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary
+                                            .withValues(alpha: 0.95),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: business.themeColor,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 _buildQuickActions(context, isServiceBiz, isFoodBiz),
                 const SizedBox(height: 20),
                 Row(
@@ -320,57 +497,64 @@ class _DashboardHome extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: (isOnline ? Colors.green : Colors.grey)
-                  .withValues(alpha: 0.3),
+              color: (isOnline ? Colors.green : Colors.grey).withValues(
+                alpha: 0.3,
+              ),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Row(children: [
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
-            child: Icon(
-              isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-              color: Colors.white, size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isOnline ? 'You are ONLINE' : 'You are OFFLINE',
-                  style: const TextStyle(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isOnline ? 'You are ONLINE' : 'You are OFFLINE',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16),
-                ),
-                Text(
-                  isOnline
-                      ? 'Visible in Near Me • Accepting requests'
-                      : 'Tap to go online & receive job requests',
-                  style: TextStyle(
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    isOnline
+                        ? 'Visible in Near Me • Accepting requests'
+                        : 'Tap to go online & receive job requests',
+                    style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12),
-                ),
-              ],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Switch(
-            value: isOnline,
-            onChanged: (v) => biz.setOnline(v),
-            activeThumbColor: Colors.white,
-            activeTrackColor: Colors.white.withValues(alpha: 0.4),
-            inactiveThumbColor: Colors.white,
-            inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
-          ),
-        ]),
+            Switch(
+              value: isOnline,
+              onChanged: (v) => biz.setOnline(v),
+              activeThumbColor: Colors.white,
+              activeTrackColor: Colors.white.withValues(alpha: 0.4),
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -378,48 +562,62 @@ class _DashboardHome extends StatelessWidget {
   // ── Incoming job requests ─────────────────────────────────────────────────
 
   Widget _buildJobRequests(
-      BuildContext context, JobProvider jobs, Color bizColor) {
-    final pending = jobs.pending;
+    BuildContext context,
+    List<JobRequest> scoped,
+    JobProvider jobs,
+    Color bizColor,
+  ) {
+    final pending = scoped.where((r) => r.isPending).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Text('Job Requests',
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(width: 8),
-          if (pending.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text('${pending.length} new',
+        Row(
+          children: [
+            Text('Job Requests', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(width: 8),
+            if (pending.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${pending.length} new',
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold)),
-            ),
-        ]),
-        const SizedBox(height: 10),
-        ...jobs.all.take(4).map((req) => _JobRequestCard(
-              req: req,
-              bizColor: bizColor,
-              onDetails: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => JobRequestDetailScreen(request: req),
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              onReject: () => jobs.reject(req.id),
-              onComplete: () => jobs.complete(req.id),
-            )),
-        if (jobs.all.length > 4) ...[
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...scoped
+            .take(4)
+            .map(
+              (req) => _JobRequestCard(
+                req: req,
+                bizColor: bizColor,
+                onDetails: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => JobRequestDetailScreen(request: req),
+                  ),
+                ),
+                onReject: () => jobs.reject(req.id),
+                onComplete: () => jobs.complete(req.id),
+              ),
+            ),
+        if (scoped.length > 4) ...[
           const SizedBox(height: 4),
           Center(
             child: TextButton(
               onPressed: () {},
-              child: Text('View all ${jobs.all.length} requests',
-                  style: TextStyle(color: bizColor)),
+              child: Text(
+                'View all ${scoped.length} requests',
+                style: TextStyle(color: bizColor),
+              ),
             ),
           ),
         ],
@@ -427,19 +625,24 @@ class _DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildRevenueCard(BuildContext context, double revenue) {
+  Widget _buildRevenueCard(
+    BuildContext context,
+    List<Order> scopedOrders,
+    bool isServiceBiz,
+    Color themeColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: AppColors.gradientPrimary,
+        gradient: LinearGradient(
+          colors: AppColors.gradientFrom(themeColor),
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: themeColor.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -449,29 +652,33 @@ class _DashboardHome extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppStrings.totalRevenue,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 14,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isServiceBiz ? 'Bookings Analytics' : 'Sales Analytics',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Rs. ${revenue.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Daily • Weekly • Monthly • Yearly',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 10),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -487,40 +694,204 @@ class _DashboardHome extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 60,
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: const [
-                      FlSpot(0, 2),
-                      FlSpot(1, 4),
-                      FlSpot(2, 3),
-                      FlSpot(3, 6),
-                      FlSpot(4, 5),
-                      FlSpot(5, 8),
-                      FlSpot(6, 7),
-                    ],
-                    isCurved: true,
-                    color: Colors.white.withValues(alpha: 0.8),
-                    barWidth: 2,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: Colors.white.withValues(alpha: 0.1),
-                    ),
+          DefaultTabController(
+            length: 4,
+            child: Column(
+              children: [
+                Container(
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
-              ),
+                  child: TabBar(
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    labelColor: themeColor,
+                    unselectedLabelColor: Colors.white,
+                    dividerColor: Colors.transparent,
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                    tabs: const [
+                      Tab(text: 'Daily'),
+                      Tab(text: 'Weekly'),
+                      Tab(text: 'Monthly'),
+                      Tab(text: 'Yearly'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 110,
+                  child: TabBarView(
+                    children: [
+                      _buildAnalyticsPanel(scopedOrders, _SalesRange.daily),
+                      _buildAnalyticsPanel(scopedOrders, _SalesRange.weekly),
+                      _buildAnalyticsPanel(scopedOrders, _SalesRange.monthly),
+                      _buildAnalyticsPanel(scopedOrders, _SalesRange.yearly),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildAnalyticsPanel(List<Order> scopedOrders, _SalesRange range) {
+    final completedOrders = scopedOrders
+        .where((o) => o.status == OrderStatus.completed)
+        .toList();
+    final rangeOrders = _ordersForRange(completedOrders, range);
+    final total = rangeOrders.fold<double>(0, (sum, o) => sum + o.totalAmount);
+    final spots = _salesSpots(completedOrders, range);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Rs. ${total.toStringAsFixed(0)}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${rangeOrders.length} completed orders in ${_rangeName(range).toLowerCase()} view',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.85),
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              gridData: const FlGridData(show: false),
+              titlesData: const FlTitlesData(show: false),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  barWidth: 2.4,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Order> _ordersForRange(List<Order> orders, _SalesRange range) {
+    final now = DateTime.now();
+    return orders.where((o) {
+      final created = o.createdAt;
+      switch (range) {
+        case _SalesRange.daily:
+          final today = DateUtils.dateOnly(now);
+          return DateUtils.dateOnly(created) == today;
+        case _SalesRange.weekly:
+          final start = DateUtils.dateOnly(
+            now.subtract(const Duration(days: 6)),
+          );
+          return !DateUtils.dateOnly(created).isBefore(start);
+        case _SalesRange.monthly:
+          final start = DateUtils.dateOnly(
+            now.subtract(const Duration(days: 29)),
+          );
+          return !DateUtils.dateOnly(created).isBefore(start);
+        case _SalesRange.yearly:
+          return !created.isBefore(now.subtract(const Duration(days: 365)));
+      }
+    }).toList();
+  }
+
+  List<FlSpot> _salesSpots(List<Order> orders, _SalesRange range) {
+    final now = DateTime.now();
+
+    switch (range) {
+      case _SalesRange.daily:
+        final buckets = List<double>.filled(6, 0);
+        final today = DateUtils.dateOnly(now);
+        for (final o in orders) {
+          final created = o.createdAt;
+          if (DateUtils.dateOnly(created) != today) continue;
+          final bucket = (created.hour ~/ 4).clamp(0, 5);
+          buckets[bucket] += o.totalAmount;
+        }
+        return List.generate(6, (i) => FlSpot(i.toDouble(), buckets[i]));
+
+      case _SalesRange.weekly:
+        final buckets = List<double>.filled(7, 0);
+        final start = DateUtils.dateOnly(now.subtract(const Duration(days: 6)));
+        for (final o in orders) {
+          final created = DateUtils.dateOnly(o.createdAt);
+          final diff = created.difference(start).inDays;
+          if (diff >= 0 && diff < 7) {
+            buckets[diff] += o.totalAmount;
+          }
+        }
+        return List.generate(7, (i) => FlSpot(i.toDouble(), buckets[i]));
+
+      case _SalesRange.monthly:
+        final buckets = List<double>.filled(6, 0);
+        final start = DateUtils.dateOnly(
+          now.subtract(const Duration(days: 29)),
+        );
+        for (final o in orders) {
+          final created = DateUtils.dateOnly(o.createdAt);
+          final diff = created.difference(start).inDays;
+          if (diff >= 0 && diff < 30) {
+            final bucket = (diff ~/ 5).clamp(0, 5);
+            buckets[bucket] += o.totalAmount;
+          }
+        }
+        return List.generate(6, (i) => FlSpot(i.toDouble(), buckets[i]));
+
+      case _SalesRange.yearly:
+        final buckets = List<double>.filled(12, 0);
+        final currentMonthKey = now.year * 12 + now.month;
+        for (final o in orders) {
+          final created = o.createdAt;
+          final orderMonthKey = created.year * 12 + created.month;
+          final diff = currentMonthKey - orderMonthKey;
+          if (diff >= 0 && diff < 12) {
+            final bucket = 11 - diff;
+            buckets[bucket] += o.totalAmount;
+          }
+        }
+        return List.generate(12, (i) => FlSpot(i.toDouble(), buckets[i]));
+    }
+  }
+
+  String _rangeName(_SalesRange range) {
+    switch (range) {
+      case _SalesRange.daily:
+        return 'Daily';
+      case _SalesRange.weekly:
+        return 'Weekly';
+      case _SalesRange.monthly:
+        return 'Monthly';
+      case _SalesRange.yearly:
+        return 'Yearly';
+    }
   }
 
   Widget _buildBusinessVisualHeader(
@@ -624,8 +995,10 @@ class _DashboardHome extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.22),
                       borderRadius: BorderRadius.circular(14),
@@ -658,7 +1031,6 @@ class _DashboardHome extends StatelessWidget {
       'clinic' => 'clinic,hospital',
       'rentacar' => 'car,rental',
       'mechanic' => 'car,repair',
-      'homeservice' => 'home,service',
       _ => 'small,business',
     };
     return 'https://source.unsplash.com/900x500/?$keyword';
@@ -684,10 +1056,18 @@ class _DashboardHome extends StatelessWidget {
     }
   }
 
-  Widget _buildQuickActions(BuildContext context, bool isServiceBiz, bool isFoodBiz) {
+  Widget _buildQuickActions(
+    BuildContext context,
+    bool isServiceBiz,
+    bool isFoodBiz,
+  ) {
     final actions = [
       _QuickAction(
-        label: isServiceBiz ? 'Add\nService' : isFoodBiz ? 'Add\nItem' : 'Add\nProduct',
+        label: isServiceBiz
+            ? 'Add\nService'
+            : isFoodBiz
+            ? 'Add\nItem'
+            : 'Add\nProduct',
         icon: isServiceBiz ? Icons.add_circle_outline : Icons.add_box_outlined,
         color: AppColors.success,
         onTap: () => Navigator.pushNamed(context, AppRoutes.addProduct),
@@ -723,41 +1103,42 @@ class _DashboardHome extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Quick Actions',
-            style: Theme.of(context).textTheme.titleLarge),
+        Text('Quick Actions', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         Row(
           children: actions
-              .map((a) => Expanded(
-                    child: GestureDetector(
-                      onTap: a.onTap,
-                      child: Container(
-                        margin: EdgeInsets.only(
-                          right: actions.last == a ? 0 : 10,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: a.color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(a.icon, color: a.color, size: 26),
-                            const SizedBox(height: 6),
-                            Text(
-                              a.label,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: a.color,
-                                fontWeight: FontWeight.w600,
-                              ),
+              .map(
+                (a) => Expanded(
+                  child: GestureDetector(
+                    onTap: a.onTap,
+                    child: Container(
+                      margin: EdgeInsets.only(
+                        right: actions.last == a ? 0 : 10,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: a.color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(a.icon, color: a.color, size: 26),
+                          const SizedBox(height: 6),
+                          Text(
+                            a.label,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: a.color,
+                              fontWeight: FontWeight.w600,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                  ))
+                  ),
+                ),
+              )
               .toList(),
         ),
       ],
@@ -784,17 +1165,17 @@ class _JobRequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPending  = req.status == 'pending';
+    final isPending = req.status == 'pending';
     final isAccepted = req.status == 'accepted';
     final isRejected = req.status == 'rejected';
 
     Color statusColor = isPending
         ? Colors.orange
         : isAccepted
-            ? Colors.green
-            : isRejected
-                ? Colors.red
-                : Colors.grey;
+        ? Colors.green
+        : isRejected
+        ? Colors.red
+        : Colors.grey;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -805,105 +1186,141 @@ class _JobRequestCard extends StatelessWidget {
         border: Border.all(color: statusColor.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(req.serviceTypeName,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  req.serviceTypeName,
                   style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold)),
-            ),
-            const Spacer(),
-            Text(req.timeAgo,
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textHint)),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: BorderRadius.circular(6),
+                    color: statusColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              child: Text(
-                isPending ? 'New' : isAccepted ? 'Accepted' : isRejected ? 'Rejected' : 'Done',
-                style: const TextStyle(
+              const Spacer(),
+              Text(
+                req.timeAgo,
+                style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isPending
+                      ? 'New'
+                      : isAccepted
+                      ? 'Accepted'
+                      : isRejected
+                      ? 'Rejected'
+                      : 'Done',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 10,
-                    fontWeight: FontWeight.bold),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
           const SizedBox(height: 8),
-          Text(req.issue,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary)),
-          const SizedBox(height: 4),
-          Row(children: [
-            const Icon(Icons.location_on_outlined,
-                size: 12, color: AppColors.textHint),
-            const SizedBox(width: 3),
-            Expanded(
-              child: Text(req.userAddress,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+          Text(
+            req.issue,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
             ),
-          ]),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                size: 12,
+                color: AppColors.textHint,
+              ),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Text(
+                  req.userAddress,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           if (isPending) ...[
             const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onReject,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    side: const BorderSide(color: AppColors.error),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Reject',
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onReject,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      side: const BorderSide(color: AppColors.error),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Reject',
                       style: TextStyle(
-                          color: AppColors.error,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: onDetails,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: bizColor,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                        color: AppColors.error,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
-                  child: const Text('Details',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
                 ),
-              ),
-            ]),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: onDetails,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: bizColor,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Details',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
           if (isAccepted) ...[
             const SizedBox(height: 10),
@@ -916,15 +1333,22 @@ class _JobRequestCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                icon: const Icon(Icons.check_circle_outline,
-                    color: Colors.white, size: 16),
-                label: const Text('Mark Complete',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13)),
+                icon: const Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 16,
+                ),
+                label: const Text(
+                  'Mark Complete',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
           ],

@@ -15,4 +15,5 @@ class AppRoutes {
   static const String payment = '/payment';
   static const String customerHome = '/customer-home';
   static const String serviceWorkerHome = '/service-worker-home';
+  static const String riderHome = '/rider-home';
 }

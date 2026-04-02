@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routes/app_routes.dart';
 import '../../models/business.dart';
@@ -30,6 +31,26 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (BusinessType.excludedFromCustomerBrowse.contains(_selectedBizType)) {
+        setState(() => _selectedBizType = 'all');
+      }
+    });
+  }
+
+  /// Respects browse chips: Café / Others / Near Me types map to "all".
+  String get _effectiveBrowseTypeId {
+    if (_selectedBizType == 'all') return 'all';
+    if (BusinessType.excludedFromCustomerBrowse.contains(_selectedBizType)) {
+      return 'all';
+    }
+    return _selectedBizType;
+  }
+
   final List<Map<String, dynamic>> _offers = [
     {
       'title': '20% OFF First Booking',
@@ -52,9 +73,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   ];
 
   List<Business> get _visibleBusinesses {
-    var list = _selectedBizType == 'all'
+    final fid = _effectiveBrowseTypeId;
+    var list = fid == 'all'
         ? allDummyBusinesses
-        : allDummyBusinesses.where((b) => b.businessTypeId == _selectedBizType).toList();
+        : allDummyBusinesses.where((b) => b.businessTypeId == fid).toList();
 
     if (_searchQuery.isNotEmpty) {
       list = list.where((b) =>
@@ -97,52 +119,84 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   // ── Bottom nav ────────────────────────────────────────────────────────────
 
   Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      currentIndex: _selectedNav,
-      onTap: (i) => setState(() => _selectedNav = i),
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: AppColors.textHint,
-      backgroundColor: AppColors.surface,
-      elevation: 12,
+    final cartCount = context.watch<CartProvider>().hasItems 
+        ? context.watch<CartProvider>().itemCountForBusiness(
+            context.watch<CartProvider>().businessId!) 
+        : 0;
+    final orderCount = context.watch<OrderProvider>().orders.length;
+
+    final labels = ['Home', 'Near Me', 'Cart', 'Bookings', 'Orders'];
+
+    return CurvedNavigationBar(
+      index: _selectedNav,
+      height: 75,
       items: [
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home_rounded),
-          label: 'Home',
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.home_outlined, size: 24, color: Colors.white),
+            if (_selectedNav != 0) ...[
+              const SizedBox(height: 2),
+              Text(labels[0], style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ],
         ),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.near_me_outlined),
-          activeIcon: Icon(Icons.near_me_rounded),
-          label: 'Near Me',
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.near_me_outlined, size: 24, color: Colors.white),
+            if (_selectedNav != 1) ...[
+              const SizedBox(height: 2),
+              Text(labels[1], style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Badge(
-            label: Text(
-              '${context.watch<CartProvider>().hasItems ? context.watch<CartProvider>().itemCountForBusiness(context.watch<CartProvider>().businessId!) : 0}',
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Badge(
+              label: cartCount > 0 ? Text('$cartCount', style: const TextStyle(fontSize: 8)) : null,
+              backgroundColor: const Color(0xFFE91E3F),
+              child: Icon(Icons.shopping_cart_outlined, size: 24, color: Colors.white),
             ),
-            isLabelVisible: context.watch<CartProvider>().hasItems,
-            child: const Icon(Icons.shopping_cart_outlined),
-          ),
-          activeIcon: const Icon(Icons.shopping_cart_rounded),
-          label: 'Cart',
+            if (_selectedNav != 2) ...[
+              const SizedBox(height: 2),
+              Text(labels[2], style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ],
         ),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_month_outlined),
-          activeIcon: Icon(Icons.calendar_month_rounded),
-          label: 'My Bookings',
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.calendar_month_outlined, size: 24, color: Colors.white),
+            if (_selectedNav != 3) ...[
+              const SizedBox(height: 2),
+              Text(labels[3], style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Badge(
-            label: Text(
-              '${context.watch<OrderProvider>().orders.length}',
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Badge(
+              label: orderCount > 0 ? Text('$orderCount', style: const TextStyle(fontSize: 8)) : null,
+              backgroundColor: const Color(0xFFE91E3F),
+              child: Icon(Icons.receipt_long_outlined, size: 24, color: Colors.white),
             ),
-            isLabelVisible: context.watch<OrderProvider>().orders.isNotEmpty,
-            child: const Icon(Icons.receipt_long_outlined),
-          ),
-          activeIcon: const Icon(Icons.receipt_long_rounded),
-          label: 'Orders',
+            if (_selectedNav != 4) ...[
+              const SizedBox(height: 2),
+              Text(labels[4], style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
+            ],
+          ],
         ),
       ],
+      onTap: (index) {
+        setState(() => _selectedNav = index);
+      },
+      backgroundColor: Colors.transparent,
+      color: AppColors.primary,
+      animationDuration: const Duration(milliseconds: 400),
+      animationCurve: Curves.easeInOut,
     );
   }
 
@@ -527,13 +581,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0B5B66), Color(0xFF0D7788)],
+          colors: AppColors.gradientPrimary,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
@@ -1364,15 +1418,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   // ── Business type category grid ───────────────────────────────────────────
 
   Widget _buildCategoryGrid() {
-    // mechanic & homeservice are Near Me only — not in browse by category
-    final types = BusinessType.all
-        .where((t) => t.id != 'mechanic' && t.id != 'homeservice')
-        .toList()
-      ..sort((a, b) {
-        if (a.id == 'other') return 1;
-        if (b.id == 'other') return -1;
-        return 0;
-      });
+    final types = BusinessType.customerBrowseTypes;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1459,9 +1505,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final list = _topRated;
     if (list.isEmpty) return const SizedBox.shrink();
 
-    final label = _selectedBizType == 'all'
+    final fid = _effectiveBrowseTypeId;
+    final label = fid == 'all'
         ? 'Top Rated'
-        : 'Top ${BusinessType.all.firstWhere((t) => t.id == _selectedBizType).title}s';
+        : 'Top ${BusinessType.all.firstWhere((t) => t.id == fid).title}s';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1491,84 +1538,112 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         width: 158,
         margin: const EdgeInsets.only(right: 12, bottom: 4, top: 2),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [biz.color, biz.color.withValues(alpha: 0.7)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: biz.color.withValues(alpha: 0.35),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 10,
                 offset: const Offset(0, 5))
           ],
         ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      shape: BoxShape.circle),
-                  child: Icon(biz.typeIcon, color: Colors.white, size: 18),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: biz.isOpen
-                        ? Colors.green.shade400
-                        : Colors.red.shade300,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    biz.isOpen ? 'Open' : 'Closed',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+            // Background image
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                image: biz.imageUrl != null && biz.imageUrl!.isNotEmpty
+                    ? DecorationImage(
+                        image: NetworkImage(biz.imageUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                color: !((biz.imageUrl != null && biz.imageUrl!.isNotEmpty))
+                    ? biz.color
+                    : null,
+              ),
             ),
-            const Spacer(),
-            Text(biz.name,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Row(children: [
-              const Icon(Icons.star_rounded, color: Colors.amber, size: 13),
-              const SizedBox(width: 3),
-              Text('${biz.rating}',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold)),
-              Text('  (${biz.reviewCount})',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 11)),
-            ]),
-            const SizedBox(height: 4),
-            Row(children: [
-              const Icon(Icons.inventory_2_outlined,
-                  color: Colors.white70, size: 12),
-              const SizedBox(width: 3),
-              Text('${biz.items.length} items',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 11)),
-            ]),
+            // Gradient overlay for text
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.7),
+                  ],
+                ),
+              ),
+            ),
+            // Content (positioned at bottom)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Top row: icon + status
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle),
+                        child: Icon(biz.typeIcon, color: Colors.white, size: 16),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: biz.isOpen
+                              ? Colors.green.shade400
+                              : Colors.red.shade300,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          biz.isOpen ? 'Open' : 'Closed',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Bottom section: name + rating
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(biz.name,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        const Icon(Icons.star_rounded, color: Colors.amber, size: 12),
+                        const SizedBox(width: 2),
+                        Text('${biz.rating}',
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold)),
+                        Text('(${biz.reviewCount})',
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 10)),
+                      ]),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -1579,11 +1654,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   Widget _buildAllBusinesses() {
     final list = _visibleBusinesses;
-    final typeLabel = _selectedBizType == 'all'
+    final fid = _effectiveBrowseTypeId;
+    final typeLabel = fid == 'all'
         ? 'All Businesses'
-        : BusinessType.all
-            .firstWhere((t) => t.id == _selectedBizType)
-            .title;
+        : BusinessType.all.firstWhere((t) => t.id == fid).title;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -7,6 +7,7 @@ import '../../models/product.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/common/app_asset_image.dart';
+import '../../widgets/common/themed_dialog_wrapper.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -28,6 +29,7 @@ class _ProductsScreenState extends State<ProductsScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -45,95 +47,226 @@ class _ProductsScreenState extends State<ProductsScreen>
     final isFood = _isFoodBiz(bizId);
     final isGym = _isGymBiz(bizId);
     final bizColor = biz.themeColor;
+    final headerGradient = AppColors.gradientFrom(bizColor);
     final allowedCategories = biz.categories.toSet();
     final categories = ['All', ...biz.categories];
-    final selectedCategory =
-        categories.contains(_selectedCategory) ? _selectedCategory : 'All';
+    final selectedCategory = categories.contains(_selectedCategory)
+        ? _selectedCategory
+        : 'All';
     final scopedProducts = bizId.isEmpty
         ? productProv.products
         : productProv.productsForBusiness(bizId);
     final products = scopedProducts
         .where((p) => allowedCategories.contains(p.category))
-        .where((p) => selectedCategory == 'All' || p.category == selectedCategory)
+        .where(
+          (p) => selectedCategory == 'All' || p.category == selectedCategory,
+        )
         .toList();
-    final deals = (bizId.isEmpty
-            ? productProv.activeDeals
-            : productProv.activeDealsForBusiness(bizId))
-        .where((p) => allowedCategories.contains(p.category))
-        .toList();
+    final deals =
+        (bizId.isEmpty
+                ? productProv.activeDeals
+                : productProv.activeDealsForBusiness(bizId))
+            .where((p) => allowedCategories.contains(p.category))
+            .toList();
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          isGym ? 'Packages & Services' : isService ? 'My Services' : isFood ? 'My Menu' : 'My Products',
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle_rounded, color: bizColor, size: 28),
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.addProduct),
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: headerGradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(28),
+                bottomRight: Radius.circular(28),
+              ),
+            ),
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              left: 20,
+              right: 20,
+              bottom: 16,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isGym
+                            ? 'Packages & Services'
+                            : isService
+                            ? 'My Services'
+                            : isFood
+                            ? 'My Menu'
+                            : 'My Products',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isService
+                            ? 'Manage services, pricing and availability'
+                            : 'Manage products, categories and stock visibility',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_circle_rounded,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.addProduct),
+                ),
+              ],
+            ),
+          ),
+          if (isFood)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.all(Radius.circular(20)),
+                  gradient: LinearGradient(
+                    colors: headerGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: List.generate(2, (index) {
+                    final isSelected = _tabCtrl.index == index;
+                    final labels = ['Menu', 'Deals'];
+                    final counts = [scopedProducts.length, deals.length];
+                    final icons = [
+                      Icons.restaurant_menu_rounded,
+                      Icons.local_offer_rounded,
+                    ];
+                    return GestureDetector(
+                      onTap: () => setState(() => _tabCtrl.animateTo(index)),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              icons[index],
+                              size: 14,
+                              color: isSelected ? bizColor : Colors.white,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              labels[index],
+                              style: TextStyle(
+                                color: isSelected ? bizColor : Colors.white,
+                                fontSize: 12,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                              ),
+                            ),
+                            if (counts[index] > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE91E3F),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '${counts[index]}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+          Expanded(
+            child: isFood
+                ? TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _productList(
+                        products,
+                        bizId,
+                        bizColor,
+                        categories,
+                        selectedCategory,
+                      ),
+                      _dealsList(deals, bizColor, productProv),
+                    ],
+                  )
+                : _productList(
+                    products,
+                    bizId,
+                    bizColor,
+                    categories,
+                    selectedCategory,
+                  ),
           ),
         ],
-        // Tab bar for food businesses (Products / Deals)
-        bottom: isFood
-            ? TabBar(
-                controller: _tabCtrl,
-                indicatorColor: bizColor,
-                labelColor: bizColor,
-                unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                tabs: [
-                  Tab(text: 'Menu (${scopedProducts.length})'),
-                  Tab(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Deals'),
-                        if (deals.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.orange,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text('${deals.length}',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            : null,
       ),
-      body: isFood
-          ? TabBarView(
-              controller: _tabCtrl,
-              children: [
-                _productList(products, bizId, bizColor, categories, selectedCategory),
-                _dealsList(deals, bizColor, productProv),
-              ],
-            )
-          : _productList(products, bizId, bizColor, categories, selectedCategory),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'add-product-fab',
         onPressed: () => Navigator.pushNamed(context, AppRoutes.addProduct),
         backgroundColor: bizColor,
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text(
-          isGym ? 'Add Package' : isService ? 'Add Service' : isFood ? 'Add Item' : 'Add Product',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          isGym
+              ? 'Add Package'
+              : isService
+              ? 'Add Service'
+              : isFood
+              ? 'Add Item'
+              : 'Add Product',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
@@ -164,16 +297,23 @@ class _ProductsScreenState extends State<ProductsScreen>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 6),
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: selected ? bizColor : bizColor.withValues(alpha: 0.1),
+                    color: selected
+                        ? bizColor
+                        : bizColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(cat,
-                      style: TextStyle(
-                          color: selected ? Colors.white : bizColor,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13)),
+                  child: Text(
+                    cat,
+                    style: TextStyle(
+                      color: selected ? Colors.white : bizColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               );
             },
@@ -186,13 +326,16 @@ class _ProductsScreenState extends State<ProductsScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.inventory_2_outlined,
-                          size: 64,
-                          color: bizColor.withValues(alpha: 0.4)),
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 64,
+                        color: bizColor.withValues(alpha: 0.4),
+                      ),
                       const SizedBox(height: 12),
-                      const Text('Nothing here yet',
-                          style:
-                              TextStyle(color: AppColors.textSecondary)),
+                      const Text(
+                        'Nothing here yet',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
                     ],
                   ),
                 )
@@ -216,22 +359,27 @@ class _ProductsScreenState extends State<ProductsScreen>
     );
   }
 
-  Widget _dealsList(
-      List<Product> deals, Color bizColor, ProductProvider prov) {
+  Widget _dealsList(List<Product> deals, Color bizColor, ProductProvider prov) {
     if (deals.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.local_offer_outlined,
-                size: 64, color: Colors.orange.withValues(alpha: 0.4)),
+            Icon(
+              Icons.local_offer_outlined,
+              size: 64,
+              color: Colors.orange.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: 12),
-            const Text('No active deals',
-                style: TextStyle(color: AppColors.textSecondary)),
+            const Text(
+              'No active deals',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 6),
-            const Text('Add a discount when creating a menu item',
-                style: TextStyle(
-                    fontSize: 12, color: AppColors.textHint)),
+            const Text(
+              'Add a discount when creating a menu item',
+              style: TextStyle(fontSize: 12, color: AppColors.textHint),
+            ),
           ],
         ),
       );
@@ -251,16 +399,18 @@ class _ProductsScreenState extends State<ProductsScreen>
             border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             boxShadow: [
               BoxShadow(
-                  color: Colors.orange.withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3)),
+                color: Colors.orange.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
             ],
           ),
           child: Row(
             children: [
               // Discount badge
               Container(
-                width: 64, height: 64,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Colors.orange, Color(0xFFFF6F00)],
@@ -272,16 +422,22 @@ class _ProductsScreenState extends State<ProductsScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('${p.discountPercent.toStringAsFixed(0)}%',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18)),
-                    const Text('OFF',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      '${p.discountPercent.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const Text(
+                      'OFF',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -290,35 +446,43 @@ class _ProductsScreenState extends State<ProductsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: AppColors.textPrimary)),
+                    Text(
+                      p.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         Text(
                           'Rs. ${p.price.toStringAsFixed(0)}',
                           style: const TextStyle(
-                              decoration: TextDecoration.lineThrough,
-                              color: AppColors.textHint,
-                              fontSize: 12),
+                            decoration: TextDecoration.lineThrough,
+                            color: AppColors.textHint,
+                            fontSize: 12,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Rs. ${p.discountedPrice.toStringAsFixed(0)}',
                           style: const TextStyle(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15),
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                       ],
                     ),
-                    Text(p.category,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary)),
+                    Text(
+                      p.category,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -365,9 +529,10 @@ class _ProductCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Padding(
@@ -378,20 +543,19 @@ class _ProductCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  width: 62, height: 62,
+                  width: 62,
+                  height: 62,
                   decoration: BoxDecoration(
                     color: bizColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: (product.imageUrl.isNotEmpty &&
+                    child:
+                        (product.imageUrl.isNotEmpty &&
                             !product.imageUrl.startsWith('http') &&
                             File(product.imageUrl).existsSync())
-                        ? Image.file(
-                            File(product.imageUrl),
-                            fit: BoxFit.cover,
-                          )
+                        ? Image.file(File(product.imageUrl), fit: BoxFit.cover)
                         : Center(
                             child: AppAssetImage(
                               businessTypeId: bizId,
@@ -406,10 +570,13 @@ class _ProductCard extends StatelessWidget {
                 ),
                 if (product.hasDiscount)
                   Positioned(
-                    top: 0, right: 0,
+                    top: 0,
+                    right: 0,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 2),
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.orange,
                         borderRadius: BorderRadius.circular(6),
@@ -417,9 +584,10 @@ class _ProductCard extends StatelessWidget {
                       child: Text(
                         '${product.discountPercent.toStringAsFixed(0)}%',
                         style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold),
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -432,71 +600,114 @@ class _ProductCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(product.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: AppColors.textPrimary)),
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(product.category,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary)),
+                  Text(
+                    product.category,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       if (product.hasDiscount) ...[
-                        Text('Rs. ${product.price.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                                decoration: TextDecoration.lineThrough,
-                                color: AppColors.textHint,
-                                fontSize: 11)),
+                        Text(
+                          'Rs. ${product.price.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            color: AppColors.textHint,
+                            fontSize: 11,
+                          ),
+                        ),
                         const SizedBox(width: 6),
-                        Text('Rs. ${product.discountedPrice.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                                color: Colors.orange,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
+                        Text(
+                          'Rs. ${product.discountedPrice.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
                       ] else
-                        Text('Rs. ${product.price.toStringAsFixed(0)}',
-                            style: TextStyle(
-                                color: bizColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
+                        Text(
+                          'Rs. ${product.price.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            color: bizColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
                       if (!_isGym && product.unit != null) ...[
-                        Text('  ${product.unit}',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary)),
+                        Text(
+                          '  ${product.unit}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                       ],
-                      if (_isService && !_isGym && product.durationMinutes != null) ...[
+                      if (_isService &&
+                          !_isGym &&
+                          product.durationMinutes != null) ...[
                         const SizedBox(width: 8),
-                        const Icon(Icons.access_time_rounded,
-                            size: 11, color: AppColors.textHint),
+                        const Icon(
+                          Icons.access_time_rounded,
+                          size: 11,
+                          color: AppColors.textHint,
+                        ),
                         const SizedBox(width: 2),
-                        Text('${product.durationMinutes} min',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary)),
+                        Text(
+                          '${product.durationMinutes} min',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                       ],
                     ],
                   ),
                   // Gym: duration + trainer + session badges
                   if (_isGym) ...[
                     const SizedBox(height: 6),
-                    Wrap(spacing: 6, runSpacing: 4, children: [
-                      if (product.unit != null)
-                        _badge(Icons.calendar_month_rounded,
-                            product.unit!, bizColor),
-                      if (_isGymMembership && product.withTrainer == true)
-                        _badge(Icons.sports_gymnastics_rounded,
-                            'With Trainer', Colors.green.shade600),
-                      if (_isGymMembership && product.withTrainer == false)
-                        _badge(Icons.fitness_center_rounded,
-                            'Self Workout', Colors.blueGrey),
-                      if (product.durationMinutes != null)
-                        _badge(Icons.access_time_rounded,
-                            '${product.durationMinutes} min', Colors.purple),
-                    ]),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        if (product.unit != null)
+                          _badge(
+                            Icons.calendar_month_rounded,
+                            product.unit!,
+                            bizColor,
+                          ),
+                        if (_isGymMembership && product.withTrainer == true)
+                          _badge(
+                            Icons.sports_gymnastics_rounded,
+                            'With Trainer',
+                            Colors.green.shade600,
+                          ),
+                        if (_isGymMembership && product.withTrainer == false)
+                          _badge(
+                            Icons.fitness_center_rounded,
+                            'Self Workout',
+                            Colors.blueGrey,
+                          ),
+                        if (product.durationMinutes != null)
+                          _badge(
+                            Icons.access_time_rounded,
+                            '${product.durationMinutes} min',
+                            Colors.purple,
+                          ),
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -513,8 +724,11 @@ class _ProductCard extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: () => _confirmDelete(context),
-                  child: const Icon(Icons.delete_outline,
-                      color: AppColors.error, size: 20),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.error,
+                    size: 20,
+                  ),
                 ),
               ],
             ),
@@ -525,42 +739,59 @@ class _ProductCard extends StatelessWidget {
   }
 
   Widget _badge(IconData icon, String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withValues(alpha: 0.3)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w600, color: color)),
-        ]),
-      );
+      ],
+    ),
+  );
 
   void _confirmDelete(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete?'),
-        content: Text('Remove "${product.name}" from your listing?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              onDelete();
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+      builder: (_) => wrapDialogWithTheme(
+        context,
+        accentColor: bizColor,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
+          title: const Text('Delete?'),
+          content: Text('Remove "${product.name}" from your listing?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                onDelete();
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

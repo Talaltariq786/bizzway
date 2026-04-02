@@ -43,9 +43,8 @@ class BusinessProvider extends ChangeNotifier {
   bool get isOnline => _isOnline;
   String get subscriptionPlan => _subscriptionPlan;
 
-  /// Near Me service providers (mechanic, electrician, plumber, etc.)
-  bool get isNearMeType => ['mechanic', 'homeservice', 'petcare',
-      'beauty', 'salon'].contains(_selectedBusiness?.id);
+  /// Field / Near Me jobs (auto workshop only). Salon/beauty use open hours, not this toggle.
+  bool get isNearMeType => _selectedBusiness?.id == 'mechanic';
 
   /// Calculates total delivery charge for a given distance
   double deliveryChargeFor(double distanceKm) {

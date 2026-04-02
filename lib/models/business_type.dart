@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/constants/grocery_categories.dart';
+
 class BusinessType {
   final String id;
   final String title;
@@ -26,13 +28,13 @@ class BusinessType {
           categories: ['Food', 'Drinks', 'Combos', 'Desserts'],
           color: Color(0xFFFF6B6B),
         ),
-        const BusinessType(
+        BusinessType(
           id: 'grocery',
           title: 'Grocery',
           icon: Icons.local_grocery_store,
           imageUrl: 'https://via.placeholder.com/100?text=Grocery',
-          categories: ['Dairy', 'Bakery', 'Staples', 'Beverages'],
-          color: Color(0xFF4CAF50),
+          categories: List<String>.from(GroceryCategories.aisleNames),
+          color: const Color(0xFF4CAF50),
         ),
         const BusinessType(
           id: 'salon',
@@ -117,14 +119,6 @@ class BusinessType {
           color: Color(0xFF455A64),
         ),
         const BusinessType(
-          id: 'homeservice',
-          title: 'Home Services',
-          icon: Icons.handyman_rounded,
-          imageUrl: 'https://via.placeholder.com/100?text=HomeService',
-          categories: ['Electrician', 'Plumber', 'Locksmith', 'Painter', 'AC Repair', 'Carpenter'],
-          color: Color(0xFF5C6BC0),
-        ),
-        const BusinessType(
           id: 'petcare',
           title: 'Pet Care',
           icon: Icons.pets_rounded,
@@ -133,4 +127,23 @@ class BusinessType {
           color: Color(0xFFFF7043),
         ),
       ];
+
+  /// Owner signup: hidden types (customer-facing Café/Others removed from grid).
+  static const Set<String> excludedFromOwnerSelection = {
+    'cafe',
+    'others',
+  };
+
+  /// Customer home / My Orders category tab: no Café / Others, and Near Me-only types.
+  static const Set<String> excludedFromCustomerBrowse = {
+    'mechanic',
+    'homeservice',
+    'cafe',
+    'others',
+  };
+
+  /// Horizontal chips on customer home — filtered [all].
+  static List<BusinessType> get customerBrowseTypes => all
+      .where((t) => !excludedFromCustomerBrowse.contains(t.id))
+      .toList();
 }

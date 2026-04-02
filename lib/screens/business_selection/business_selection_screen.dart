@@ -11,7 +11,9 @@ class BusinessSelectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final businesses = BusinessType.all;
+    final businesses = BusinessType.all
+        .where((b) => !BusinessType.excludedFromOwnerSelection.contains(b.id))
+        .toList();
 
     return Scaffold(
       body: SafeArea(
@@ -42,9 +44,13 @@ class BusinessSelectionScreen extends StatelessWidget {
                           height: 1.2)),
                   const SizedBox(height: 8),
                   const Text(
-                    'Select your business type to get started',
-                      style: TextStyle(
-                          fontSize: 14, color: AppColors.textSecondary)),
+                    'Pehli dafa setup — login alag hai. Yeh type baad mein profile se change nahi hoti.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
                 ],
               ),
             ),

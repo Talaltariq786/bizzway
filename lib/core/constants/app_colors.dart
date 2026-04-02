@@ -39,4 +39,9 @@ class AppColors {
     Color(0xFF6C63FF),
     Color(0xFF48C9B0),
   ];
+
+  static List<Color> gradientFrom(Color seed) => [
+    Color.lerp(seed, Colors.black, 0.16) ?? seed,
+    Color.lerp(seed, Colors.white, 0.08) ?? seed,
+  ];
 }

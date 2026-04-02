@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/routes/app_routes.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/business_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -45,6 +48,48 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _logoController.forward().then((_) => _textController.forward());
+    
+    // Check auth status after animation
+    _checkAuthAndNavigate();
+  }
+
+  Future<void> _checkAuthAndNavigate() async {
+    await Future.delayed(const Duration(milliseconds: 2500));
+    
+    if (!mounted) return;
+    
+    final auth = context.read<AuthProvider>();
+    
+    // Check if user is already logged in
+    await auth.checkAuthStatus();
+    
+    if (!mounted) return;
+    
+    if (auth.isAuthenticated) {
+      // User is already logged in - route based on user type
+      if (auth.userType == UserType.customer) {
+        Navigator.pushReplacementNamed(context, AppRoutes.customerHome);
+      } else if (auth.userType == UserType.serviceWorker) {
+        Navigator.pushReplacementNamed(context, AppRoutes.serviceWorkerHome);
+      } else if (auth.userType == UserType.rider) {
+        Navigator.pushReplacementNamed(context, AppRoutes.riderHome);
+      } else {
+        // Business owner - check if business is selected
+        final business = context.read<BusinessProvider>();
+        await business.loadBusiness();
+        
+        if (!mounted) return;
+        
+        if (business.selectedBusiness == null) {
+          Navigator.pushReplacementNamed(context, AppRoutes.businessSelection);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+        }
+      }
+    } else {
+      // Not logged in - go to login
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    }
   }
 
   @override

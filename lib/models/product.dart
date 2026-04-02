@@ -14,6 +14,10 @@ class Product {
   int? durationMinutes;   // salon/clinic sessions (minutes) | gym classes
   String? unit;           // grocery/pharmacy unit | gym: package duration ('1 Month','3 Months',etc.)
   bool? withTrainer;      // gym memberships only
+  /// Pharmacy: cart must reach this amount (Rs.) for [discountPercent] to apply.
+  double? minOrderForDiscount;
+  bool isRamzanSpecial;   // Ramzan-specific package/offer
+  bool isValentinesSpecial;   // Valentine's Day special offer
   final List<String> bundleItems; // combo/package contents (names)
 
   Product({
@@ -29,6 +33,9 @@ class Product {
     this.durationMinutes,
     this.unit,
     this.withTrainer,
+    this.minOrderForDiscount,
+    this.isRamzanSpecial = false,
+    this.isValentinesSpecial = false,
     this.bundleItems = const [],
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -52,6 +59,9 @@ class Product {
     int? durationMinutes,
     String? unit,
     bool? withTrainer,
+    double? minOrderForDiscount,
+    bool? isRamzanSpecial,
+    bool? isValentinesSpecial,
     List<String>? bundleItems,
   }) {
     return Product(
@@ -67,6 +77,9 @@ class Product {
       durationMinutes: durationMinutes ?? this.durationMinutes,
       unit: unit ?? this.unit,
       withTrainer: withTrainer ?? this.withTrainer,
+      minOrderForDiscount: minOrderForDiscount ?? this.minOrderForDiscount,
+      isRamzanSpecial: isRamzanSpecial ?? this.isRamzanSpecial,
+      isValentinesSpecial: isValentinesSpecial ?? this.isValentinesSpecial,
       bundleItems: bundleItems ?? this.bundleItems,
       createdAt: createdAt,
     );

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/grocery_categories.dart';
 import '../../models/business.dart';
 import '../../models/business_type.dart';
 import '../../models/order.dart';
@@ -12,6 +13,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../core/utils/async_guard.dart';
 import 'book_slot_screen.dart';
+import '../gym/gym_online_admission_screen.dart';
 import '../../core/media/app_media.dart';
 import '../../widgets/common/app_asset_image.dart';
 
@@ -57,7 +59,6 @@ String _bizKw(String bizTypeId) {
     case 'flowers':     return 'flowers,bouquet,floral';
     case 'rentacar':    return 'car,automobile,vehicle';
     case 'mechanic':    return 'car,repair,workshop';
-    case 'homeservice': return 'tools,repair,home';
     case 'petcare':     return 'pet,dog,animal';
     default:            return 'store,shop,business';
   }
@@ -245,6 +246,15 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
   _Mode get mode => _modeFor(biz.businessTypeId);
 
   List<String> get _categories {
+    if (biz.businessTypeId == 'grocery') {
+      final extra = biz.items
+          .map((i) => i.category)
+          .where((c) => !GroceryCategories.aisleNamesSet.contains(c))
+          .toSet()
+          .toList()
+        ..sort();
+      return ['All', ...GroceryCategories.aisleNames, ...extra];
+    }
     final cats = biz.items.map((i) => i.category).toSet().toList();
     return ['All', ...cats];
   }
@@ -254,8 +264,18 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
     return biz.items.where((i) => i.category == _selectedCategory).toList();
   }
 
-  List<String> get _rawCategories =>
-      biz.items.map((i) => i.category).toSet().toList();
+  List<String> get _rawCategories {
+    if (biz.businessTypeId == 'grocery') {
+      final extra = biz.items
+          .map((i) => i.category)
+          .where((c) => !GroceryCategories.aisleNamesSet.contains(c))
+          .toSet()
+          .toList()
+        ..sort();
+      return [...GroceryCategories.aisleNames, ...extra];
+    }
+    return biz.items.map((i) => i.category).toSet().toList();
+  }
 
   Map<String, int> get _cart =>
       context.read<CartProvider>().itemsForBusiness(biz.id);
@@ -331,16 +351,33 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
   @override
   Widget build(BuildContext context) {
     return Consumer<CartProvider>(
-      builder: (context, cartProvider, child) => Scaffold(
-        backgroundColor: AppColors.backgroundLight,
-        body: mode == _Mode.food
-            ? _foodBody()
-            : mode == _Mode.shop
-                ? _shopBody()
-                : mode == _Mode.clinic
-                    ? _clinicBody()
-                    : _serviceBody(),
-        bottomNavigationBar: _buildCartBar(),
+      builder: (context, cartProvider, child) => PopScope(
+        canPop: _selectedCategory == 'All',
+        onPopInvoked: (didPop) {
+          if (didPop) return;
+          if (_selectedCategory == 'All') return;
+
+          // Back pressed while a category is selected.
+          // Reset the filter first instead of leaving to the dashboard.
+          setState(() => _selectedCategory = 'All');
+          if (mode == _Mode.food &&
+              _tabCtrl != null &&
+              _tabCtrl!.length > 0 &&
+              _tabCtrl!.index != 0) {
+            _tabCtrl!.animateTo(0);
+          }
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.backgroundLight,
+          body: mode == _Mode.food
+              ? _foodBody()
+              : mode == _Mode.shop
+                  ? _shopBody()
+                  : mode == _Mode.clinic
+                      ? _clinicBody()
+                      : _serviceBody(),
+          bottomNavigationBar: _buildCartBar(),
+        ),
       ),
     );
   }
@@ -917,6 +954,23 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
     );
   }
 
+  /// Shop category grid: 2 cols on phones, 3 on tablets, 4 on wide; aspect tuned to avoid overflow.
+  static int _shopGridColumnCount(double width) {
+    if (width >= 1100) return 4;
+    if (width >= 700) return 3;
+    return 2;
+  }
+
+  /// Width/height of each grid cell — tuned to match compact card (image + text block).
+  static double _shopGridChildAspectRatio(double gridWidth, int columns) {
+    final spacing = 10.0;
+    final tileW =
+        (gridWidth - (columns - 1) * spacing) / columns.clamp(1, 99);
+    if (tileW < 158) return 0.72;
+    if (tileW < 200) return 0.76;
+    return 0.80;
+  }
+
   Widget _productSection(String cat) {
     final items = biz.items.where((i) => i.category == cat).toList();
     return Padding(
@@ -943,15 +997,242 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
             ],
           ),
           const SizedBox(height: 12),
-          ...items.map((item) => _shopProductCard(item)),
-          const SizedBox(height: 80),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Center(
+                child: Text(
+                  'Is category mein abhi koi product nahi — owner jald add karega.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 10.0;
+                final w = constraints.maxWidth;
+                final cols = _shopGridColumnCount(w);
+                final aspect = _shopGridChildAspectRatio(w, cols);
+                final tileW = (w - (cols - 1) * spacing) / cols;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: cols,
+                    mainAxisSpacing: spacing,
+                    crossAxisSpacing: spacing,
+                    childAspectRatio: aspect,
+                  ),
+                  itemBuilder: (_, i) => _shopProductCard(
+                    items[i],
+                    compact: true,
+                    tileWidth: tileW,
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _shopProductCard(BusinessItem item) {
+  Widget _shopProductCard(
+    BusinessItem item, {
+    bool compact = false,
+    double? tileWidth,
+  }) {
     final qty = _cart[item.id] ?? 0;
+    final tw = tileWidth ?? 164.0;
+
+    if (compact) {
+      final pad = tw < 150 ? 8.0 : 9.0;
+      final nameFs = tw < 148 ? 12.0 : (tw < 190 ? 13.0 : 14.0);
+      final subFs = tw < 148 ? 9.5 : 10.0;
+      final priceFs = tw < 148 ? 12.5 : 14.0;
+      return GestureDetector(
+        onTap: () => _showItemDetail(item),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, c) {
+                        final h = c.maxHeight;
+                        final w = c.maxWidth;
+                        return _netImg(
+                          _img('${biz.id}_${item.id}',
+                              _itemKw(biz.businessTypeId, item.name),
+                              w: 700,
+                              h: 360),
+                          width: w,
+                          height: h,
+                          fit: BoxFit.cover,
+                          fallback: AppAssetImage(
+                            businessTypeId: biz.businessTypeId,
+                            seed: '${biz.id}_${item.id}',
+                            itemName: item.name,
+                            width: w,
+                            height: h,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        );
+                      },
+                    ),
+                    if (item.hasDiscount)
+                      Positioned(
+                        left: tw < 160 ? 6 : 8,
+                        top: tw < 160 ? 6 : 8,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: tw < 160 ? 6 : 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE10075),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${item.discountPercent.toStringAsFixed(0)}% OFF',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: tw < 160 ? 9 : 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(pad, 8, pad, 9),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: nameFs,
+                        height: 1.2,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.unit != null
+                          ? '${item.category} • ${item.unit}'
+                          : item.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: subFs,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (item.hasDiscount &&
+                                  item.originalPrice != null)
+                                Text(
+                                  'Rs. ${item.originalPrice!.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontSize: tw < 148 ? 9 : 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
+                              Text(
+                                'Rs. ${item.price.toStringAsFixed(0)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: priceFs,
+                                  color: color,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: qty == 0
+                              ? GestureDetector(
+                                  onTap: () => _add(item.id),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      tw < 152 ? '+' : 'Add',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : _qtyControl(item.id, color),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── Full-width list card (non-compact) ─────────────────────────────
+    const imgH = 145.0;
+    final pad = 12.0;
     return GestureDetector(
       onTap: () => _showItemDetail(item),
       child: Container(
@@ -969,6 +1250,7 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               children: [
@@ -981,13 +1263,13 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
                         w: 700,
                         h: 360),
                     width: double.infinity,
-                    height: 145,
+                    height: imgH,
                     fallback: AppAssetImage(
                       businessTypeId: biz.businessTypeId,
                       seed: '${biz.id}_${item.id}',
                       itemName: item.name,
                       width: double.infinity,
-                      height: 145,
+                      height: imgH,
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(14),
                       ),
@@ -1018,11 +1300,13 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
               ],
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              padding: EdgeInsets.fromLTRB(pad, 10, pad, pad),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item.name,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -1032,6 +1316,8 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
                     item.unit != null
                         ? '${item.category} • ${item.unit}'
                         : item.category,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 11, color: AppColors.textSecondary),
                   ),
@@ -1074,49 +1360,59 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
                   ],
                   const SizedBox(height: 10),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (item.hasDiscount && item.originalPrice != null)
-                            Text(
-                              'Rs. ${item.originalPrice!.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary,
-                                decoration: TextDecoration.lineThrough,
-                              ),
-                            ),
-                          Text(
-                            'Rs. ${item.price.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: color,
-                            ),
-                          ),
-                        ],
-                      ),
-                      qty == 0
-                          ? GestureDetector(
-                              onTap: () => _add(item.id),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  borderRadius: BorderRadius.circular(10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (item.hasDiscount && item.originalPrice != null)
+                              Text(
+                                'Rs. ${item.originalPrice!.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textSecondary,
+                                  decoration: TextDecoration.lineThrough,
                                 ),
-                                child: const Text('+ Add',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12)),
                               ),
-                            )
-                          : _qtyControl(item.id, color),
+                            Text(
+                              'Rs. ${item.price.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: qty == 0
+                            ? GestureDetector(
+                                onTap: () => _add(item.id),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Text('+ Add',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12)),
+                                ),
+                              )
+                            : _qtyControl(item.id, color),
+                      ),
                     ],
                   ),
                 ],
@@ -1476,6 +1772,70 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _infoStrip(),
+              if (biz.businessTypeId == 'gym') ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Material(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              GymOnlineAdmissionScreen(business: biz),
+                        ),
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.how_to_reg_rounded,
+                                color: color,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Online admission',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Package choose karein, ticket banayein — payment gym par cash.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary
+                                          .withValues(alpha: 0.95),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: color),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               // ── Offers / Discounted services ───────────────────────────

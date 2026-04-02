@@ -5,7 +5,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../models/business_type.dart';
 import '../../models/order.dart';
+import '../../models/job_request.dart';
 import '../../providers/business_provider.dart';
+import '../../providers/job_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/orders/order_card.dart';
 
@@ -24,6 +26,7 @@ class _OrdersScreenState extends State<OrdersScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+    _tabController.addListener(() => setState(() {}));
   }
 
   @override
@@ -37,6 +40,8 @@ class _OrdersScreenState extends State<OrdersScreen>
     final orders = context.watch<OrderProvider>();
     final biz = context.watch<BusinessProvider>();
     final bizId = biz.selectedBusiness?.id;
+    final themeColor = biz.themeColor;
+    final headerGradient = AppColors.gradientFrom(themeColor);
 
     List<Order> scoped(List<Order> list) {
       if (bizId == null || bizId.isEmpty) return list;
@@ -53,43 +58,367 @@ class _OrdersScreenState extends State<OrdersScreen>
       billsByCategory.putIfAbsent(o.businessTypeId, () => []).add(o);
     }
 
+    final tabs = [
+      ('All', all.length, Icons.grid_view_rounded),
+      ('Pending', pending.length, Icons.hourglass_top_rounded),
+      ('Active', active.length, Icons.local_shipping_rounded),
+      ('Completed', completed.length, Icons.check_circle_rounded),
+      ('Bills', billsByCategory.length, Icons.receipt_rounded),
+    ];
+
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text(AppStrings.orders),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          tabs: [
-            Tab(text: 'All (${all.length})'),
-            Tab(text: 'Pending (${pending.length})'),
-            Tab(text: 'Active (${active.length})'),
-            Tab(text: 'Completed (${completed.length})'),
-            const Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+      backgroundColor: AppColors.backgroundLight,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: headerGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                ),
+              ),
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 12,
+                left: 20,
+                right: 20,
+                bottom: 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.receipt_rounded, size: 16),
-                  SizedBox(width: 4),
-                  Text('Bills'),
+                  Text(
+                    AppStrings.orders,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Manage incoming orders and billing by category',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.all(Radius.circular(20)),
+                  gradient: LinearGradient(
+                    colors: headerGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: List.generate(tabs.length, (index) {
+                      final isSelected = _tabController.index == index;
+                      final (label, count, icon) = tabs[index];
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => _tabController.animateTo(index)),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                icon,
+                                size: 14,
+                                color: isSelected ? themeColor : Colors.white,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  color: isSelected ? themeColor : Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                ),
+                              ),
+                              if (count > 0) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE91E3F),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '$count',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_isDeliveryStoreBiz(biz.selectedBusiness?.id))
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: _StoreRiderJobsCard(
+                  businessTypeId: biz.selectedBusiness!.id,
+                  themeColor: themeColor,
+                ),
+              ),
+            ),
+          SliverFillRemaining(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, left: 12, right: 12),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _OrderList(orders: all),
+                  _OrderList(orders: pending),
+                  _OrderList(orders: active),
+                  _OrderList(orders: completed),
+                  _BillsView(billsByCategory: billsByCategory),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+    );
+  }
+}
+
+bool _isDeliveryStoreBiz(String? id) =>
+    id == 'restaurant' || id == 'grocery' || id == 'pharmacy';
+
+/// Restaurant / grocery / pharmacy: accept → preparing → ready, phir rider ko job.
+class _StoreRiderJobsCard extends StatelessWidget {
+  final String businessTypeId;
+  final Color themeColor;
+
+  const _StoreRiderJobsCard({
+    required this.businessTypeId,
+    required this.themeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final jobs = context.watch<JobProvider>().all.where((j) {
+      if (!j.isRiderJob) return false;
+      if (j.deliveryCategory != businessTypeId) return false;
+      if (j.status == 'completed' || j.status == 'rejected') return false;
+      return j.merchantFulfillmentStatus != null;
+    }).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (jobs.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _OrderList(orders: all),
-          _OrderList(orders: pending),
-          _OrderList(orders: active),
-          _OrderList(orders: completed),
-          _BillsView(billsByCategory: billsByCategory),
+          Row(
+            children: [
+              Icon(Icons.storefront_rounded, color: themeColor, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Delivery → rider',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: themeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Accept → Preparing → Ready for rider — tab qareebi rider ko job dikhe gi.',
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.3,
+              color: AppColors.textSecondary.withValues(alpha: 0.95),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...jobs.map((j) => _StoreRiderJobRow(job: j, themeColor: themeColor)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreRiderJobRow extends StatelessWidget {
+  final JobRequest job;
+  final Color themeColor;
+
+  const _StoreRiderJobRow({required this.job, required this.themeColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final jp = context.read<JobProvider>();
+    final ms = job.merchantFulfillmentStatus;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  job.customerName ?? 'Customer',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: themeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  job.merchantStatusLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: themeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (job.orderItems.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              job.orderItems.take(2).join(' · '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+          const SizedBox(height: 10),
+          if (ms == JobRequest.merchantAwaiting)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => jp.merchantAcceptDeliveryJob(job.id),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: themeColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                child: const Text('Accept order'),
+              ),
+            )
+          else if (ms == JobRequest.merchantPreparing)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => jp.merchantMarkReadyForRider(job.id),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                child: const Text('Mark ready for rider'),
+              ),
+            )
+          else if (ms == JobRequest.merchantReadyForRider)
+            Row(
+              children: [
+                Icon(Icons.pedal_bike_rounded, size: 18, color: themeColor),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    job.status == 'pending'
+                        ? 'Riders ko dikhai de raha hai (5 km)'
+                        : 'Rider ne pick kar liya',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: themeColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -110,11 +439,16 @@ class _OrderList extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.receipt_long_outlined,
-                size: 64, color: AppColors.textHint),
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 64,
+              color: AppColors.textHint,
+            ),
             SizedBox(height: 12),
-            Text('No orders here',
-                style: TextStyle(color: AppColors.textSecondary)),
+            Text(
+              'No orders here',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ],
         ),
       );
@@ -142,11 +476,16 @@ class _BillsView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.receipt_long_outlined,
-                size: 64, color: AppColors.textHint),
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 64,
+              color: AppColors.textHint,
+            ),
             SizedBox(height: 12),
-            Text('Koi bill nahi abhi tak',
-                style: TextStyle(color: AppColors.textSecondary)),
+            Text(
+              'Koi bill nahi abhi tak',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ],
         ),
       );
@@ -197,7 +536,9 @@ class _BillsView extends StatelessWidget {
                   ),
                 );
                 final totalAmount = catOrders.fold<double>(
-                    0, (sum, o) => sum + o.totalAmount);
+                  0,
+                  (sum, o) => sum + o.totalAmount,
+                );
 
                 return _CategoryBillCard(
                   bizType: bizType,
@@ -301,10 +642,7 @@ class _CategoryBillsScreen extends StatelessWidget {
   final BusinessType bizType;
   final List<Order> orders;
 
-  const _CategoryBillsScreen({
-    required this.bizType,
-    required this.orders,
-  });
+  const _CategoryBillsScreen({required this.bizType, required this.orders});
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +668,9 @@ class _CategoryBillsScreen extends StatelessWidget {
               color: bizType.color.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                  color: bizType.color.withValues(alpha: 0.25), width: 1),
+                color: bizType.color.withValues(alpha: 0.25),
+                width: 1,
+              ),
             ),
             child: Row(
               children: [
@@ -374,10 +714,8 @@ class _CategoryBillsScreen extends StatelessWidget {
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               itemCount: orders.length,
-              itemBuilder: (_, i) => _BillCard(
-                order: orders[i],
-                accentColor: bizType.color,
-              ),
+              itemBuilder: (_, i) =>
+                  _BillCard(order: orders[i], accentColor: bizType.color),
             ),
           ),
         ],
@@ -421,8 +759,11 @@ class _BillCard extends StatelessWidget {
                     color: accentColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.receipt_rounded,
-                      color: accentColor, size: 20),
+                  child: Icon(
+                    Icons.receipt_rounded,
+                    color: accentColor,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -457,20 +798,23 @@ class _BillCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
               child: Row(
                 children: [
-                  const Icon(Icons.circle,
-                      size: 5, color: AppColors.textHint),
+                  const Icon(Icons.circle, size: 5, color: AppColors.textHint),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '${item.productName} x${item.quantity}',
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                   Text(
                     'Rs. ${item.total.toStringAsFixed(0)}',
                     style: const TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary),
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -482,14 +826,19 @@ class _BillCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: [
-                  const Icon(Icons.note_alt_outlined,
-                      size: 14, color: AppColors.textHint),
+                  const Icon(
+                    Icons.note_alt_outlined,
+                    size: 14,
+                    color: AppColors.textHint,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       order.notes!,
                       style: const TextStyle(
-                          fontSize: 11, color: AppColors.textHint),
+                        fontSize: 11,
+                        color: AppColors.textHint,
+                      ),
                     ),
                   ),
                 ],
@@ -502,13 +851,18 @@ class _BillCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
             child: Row(
               children: [
-                const Icon(Icons.access_time,
-                    size: 13, color: AppColors.textHint),
+                const Icon(
+                  Icons.access_time,
+                  size: 13,
+                  color: AppColors.textHint,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   DateFormat('MMM d, h:mm a').format(order.createdAt),
                   style: const TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary),
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const Spacer(),
                 Text(
@@ -553,7 +907,10 @@ class _BillCard extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w600, color: color),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }

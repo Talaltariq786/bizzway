@@ -8,6 +8,7 @@ import 'providers/auth_provider.dart';
 import 'providers/business_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/customer_provider.dart';
+import 'providers/gym_management_provider.dart';
 import 'providers/job_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/notification_provider.dart';
@@ -25,6 +26,7 @@ import 'screens/products/products_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/customer/customer_home_screen.dart';
 import 'screens/service_worker/service_worker_home_screen.dart';
+import 'screens/rider/rider_home_screen.dart';
 import 'screens/splash/splash_screen.dart';
 
 class BizLabelApp extends StatelessWidget {
@@ -43,6 +45,7 @@ class BizLabelApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => AppointmentProvider()),
         ChangeNotifierProvider(create: (_) => JobProvider()),
+        ChangeNotifierProvider(create: (_) => GymManagementProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
       ],
       child: MaterialApp(
@@ -64,6 +67,7 @@ class BizLabelApp extends StatelessWidget {
           AppRoutes.payment: (_) => const PaymentScreen(),
           AppRoutes.customerHome: (_) => const CustomerHomeScreen(),
           AppRoutes.serviceWorkerHome: (_) => const ServiceWorkerHomeScreen(),
+          AppRoutes.riderHome: (_) => const RiderHomeScreen(),
         },
       ),
     );

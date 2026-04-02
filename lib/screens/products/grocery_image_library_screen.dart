@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/grocery_categories.dart';
 import '../../widgets/common/app_asset_image.dart';
 
 class GroceryImageSelection {
@@ -31,32 +32,10 @@ class GroceryImageLibraryScreen extends StatefulWidget {
 
 class _GroceryImageLibraryScreenState extends State<GroceryImageLibraryScreen>
     with SingleTickerProviderStateMixin {
-  static const _cats = <String>[
-    'Oil',
-    'Ghee',
-    'Rice',
-    'Daal',
-    'Flour',
-    'Milk',
-    'Tea',
-    'Spices',
-    'Sugar',
-  ];
-
-  static const Map<String, List<String>> _suggestedNamesByCat = {
-    'Oil': ['Cooking Oil', 'Sunflower Oil', 'Canola Oil'],
-    'Ghee': ['Desi Ghee', 'Vegetable Ghee'],
-    'Rice': ['Basmati Rice', 'Sella Rice'],
-    'Daal': ['Masoor Daal', 'Moong Daal', 'Chana Daal'],
-    'Flour': ['Aata (Flour)', 'Maida'],
-    'Milk': ['Milk', 'Olpers Milk', 'Milk Pack'],
-    'Tea': ['Tea', 'Tapal Tea', 'Lipton Tea'],
-    'Spices': ['Spices', 'Shan Masala', 'National Masala'],
-    'Sugar': ['Sugar'],
-  };
-
-  late final TabController _tabCtrl =
-      TabController(length: _cats.length, vsync: this);
+  late final TabController _tabCtrl = TabController(
+    length: GroceryCategories.aisleNames.length,
+    vsync: this,
+  );
   final ImagePicker _picker = ImagePicker();
   final Map<String, List<String>> _userImages = {};
 
@@ -76,7 +55,7 @@ class _GroceryImageLibraryScreenState extends State<GroceryImageLibraryScreen>
 
   Future<void> _loadAll() async {
     final prefs = await SharedPreferences.getInstance();
-    for (final cat in _cats) {
+    for (final cat in GroceryCategories.aisleNames) {
       final raw = prefs.getString(_keyFor(cat));
       if (raw == null || raw.isEmpty) {
         _userImages[cat] = <String>[];
@@ -137,18 +116,22 @@ class _GroceryImageLibraryScreenState extends State<GroceryImageLibraryScreen>
           indicatorColor: widget.accent,
           labelColor: widget.accent,
           unselectedLabelColor: AppColors.textSecondary,
-          tabs: _cats.map((c) => Tab(text: c)).toList(),
+          tabs: GroceryCategories.aisleNames
+              .map((c) => Tab(text: c))
+              .toList(),
         ),
       ),
       body: TabBarView(
         controller: _tabCtrl,
-        children: _cats.map((cat) => _tab(cat)).toList(),
+        children:
+            GroceryCategories.aisleNames.map((cat) => _tab(cat)).toList(),
       ),
     );
   }
 
   Widget _tab(String cat) {
-    final suggested = _suggestedNamesByCat[cat] ?? const <String>[];
+    final suggested =
+        GroceryCategories.suggestedItemsByAisle[cat] ?? const <String>[];
     final userImgs = _userImages[cat] ?? const <String>[];
 
     return ListView(

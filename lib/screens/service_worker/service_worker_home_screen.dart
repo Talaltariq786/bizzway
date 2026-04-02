@@ -18,6 +18,9 @@ class ServiceWorkerHomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
         title: const Text('Service Worker'),
         actions: [
           IconButton(
@@ -287,26 +290,50 @@ class ServiceWorkerHomeScreen extends StatelessWidget {
 
     // Map the worker's profession to allowed service names
     Set<String> allowedNames;
-    if (profRaw.contains('punct') || profRaw.contains('tyre') || profRaw.contains('mechanic')) {
-      allowedNames = {'puncture'};
+    if (profRaw.contains('mechanic') || profRaw.contains('auto') || profRaw.contains('car')) {
+      // Mechanic - all car/bike repair services
+      allowedNames = {
+        'puncture', 'tyre', 'battery', 'oil change', 'car repair',
+        'bike repair', 'ac gas', 'brake', 'engine', 'suspension'
+      };
     } else if (profRaw.contains('elec')) {
-      allowedNames = {'electrician'};
+      // Electrician - all electrical work
+      allowedNames = {
+        'electrician', 'wiring', 'mcb', 'ac installation',
+        'fan installation', 'electrical'
+      };
     } else if (profRaw.contains('plumb')) {
-      allowedNames = {'plumber'};
+      // Plumber - all plumbing work
+      allowedNames = {
+        'plumber', 'pipe', 'leak', 'tap', 'drainage',
+        'water', 'toilet', 'shower'
+      };
     } else if (profRaw.contains('carp')) {
-      allowedNames = {'carpenter'};
+      // Carpenter - all carpentry work
+      allowedNames = {
+        'carpenter', 'door', 'window', 'furniture',
+        'wooden', 'cabinet', 'shelf'
+      };
     } else if (profRaw.contains('paint')) {
-      allowedNames = {'painter'};
+      // Painter - all painting work
+      allowedNames = {
+        'painter', 'painting', 'wall paint',
+        'interior', 'exterior', 'colour'
+      };
     } else if (profRaw.contains('ac')) {
-      allowedNames = {'ac technician', 'ac'};
+      // AC Technician - all AC services
+      allowedNames = {
+        'ac technician', 'ac repair', 'ac', 'aircon',
+        'ac gas', 'ac servicing', 'cooling'
+      };
     } else {
-      // Fallback to strict exact match on name
+      // Fallback - match any job containing the profession name
       allowedNames = {profRaw};
     }
 
     return jobs.all.where((j) {
       final name = (j.serviceTypeName).toString().toLowerCase().trim();
-      return allowedNames.contains(name);
+      return allowedNames.any((allowed) => name.contains(allowed) || allowed.contains(name));
     });
   }
 

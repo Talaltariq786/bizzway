@@ -64,6 +64,7 @@ class Business {
   final String? tagline;
   final Color color;
   final String? phone;
+  final String? imageUrl;
   final double? deliveryBaseCharge;   // Rs. fixed base fee
   final double? deliveryPerKmCharge;  // Rs. per km
   final double? deliveryRadiusKm;     // Owner-defined delivery radius (used for tiered pricing)
@@ -80,6 +81,7 @@ class Business {
     required this.color,
     this.tagline,
     this.phone,
+    this.imageUrl,
     this.deliveryBaseCharge,
     this.deliveryPerKmCharge,
     this.deliveryRadiusKm,
@@ -175,7 +177,7 @@ class Business {
       case 'flowers':     return Icons.local_florist_rounded;
       case 'rentacar':    return Icons.directions_car_rounded;
       case 'mechanic':    return Icons.build_rounded;
-      case 'homeservice': return Icons.handyman_rounded;
+
       case 'petcare':     return Icons.pets_rounded;
       default:            return Icons.store_rounded;
     }
@@ -266,6 +268,7 @@ final List<Business> allDummyBusinesses = [
     deliveryBaseCharge: 50, deliveryPerKmCharge: 20,
     name: 'BBQ Tonight', address: 'Clifton Block 5, Karachi',
     rating: 4.7, reviewCount: 312, color: const Color(0xFFFF6B6B),
+    imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561d1a?w=300&h=300&fit=crop',
     tagline: 'Best BBQ in the city',
     items: const [
       BusinessItem(id: 'r1i1', name: 'Seekh Kabab Platter', description: '8 pcs seekh kabab with naan & raita', price: 850, category: 'BBQ'),
@@ -318,20 +321,21 @@ final List<Business> allDummyBusinesses = [
     deliveryBaseCharge: 80, deliveryPerKmCharge: 20,
     name: 'Metro Cash & Carry', address: 'Gulberg III, Lahore',
     rating: 4.3, reviewCount: 89, color: const Color(0xFF4CAF50),
+    imageUrl: 'https://images.unsplash.com/photo-1578826202332-a37ae93ba857?w=300&h=300&fit=crop',
     tagline: 'Fresh everyday essentials',
     items: const [
-      BusinessItem(id: 'g1i1', name: 'Fresh Milk (1L)', description: 'Pasteurized full-cream milk', price: 180, category: 'Dairy', unit: 'per litre'),
-      BusinessItem(id: 'g1i2', name: 'Eggs (30 pcs)', description: 'Farm fresh eggs', price: 650, category: 'Dairy'),
-      BusinessItem(id: 'g1i3', name: 'Basmati Rice (5kg)', description: 'Premium long grain rice', price: 1200, category: 'Staples', unit: 'per bag'),
-      BusinessItem(id: 'g1i4', name: 'Cooking Oil (5L)', description: 'Sunflower / canola oil', price: 2100, category: 'Staples'),
-      BusinessItem(id: 'g1i5', name: 'Tomatoes (1kg)', description: 'Fresh locally sourced', price: 120, category: 'Vegetables', unit: 'per kg'),
-      BusinessItem(id: 'g1i6', name: 'Onion (1kg)', description: 'Red onion fresh', price: 80, category: 'Vegetables', unit: 'per kg'),
+      BusinessItem(id: 'g1i1', name: 'Fresh Milk (1L)', description: 'Pasteurized full-cream milk', price: 180, category: 'Dairy & Drinks', unit: 'per litre'),
+      BusinessItem(id: 'g1i2', name: 'Eggs (30 pcs)', description: 'Farm fresh eggs', price: 650, category: 'Dairy & Drinks'),
+      BusinessItem(id: 'g1i3', name: 'Basmati Rice (5kg)', description: 'Premium long grain rice', price: 1200, category: 'Staples (Basic Food)', unit: 'per bag'),
+      BusinessItem(id: 'g1i4', name: 'Cooking Oil (5L)', description: 'Sunflower / canola oil', price: 2100, category: 'Oil & Ghee'),
+      BusinessItem(id: 'g1i5', name: 'Tomatoes (1kg)', description: 'Fresh locally sourced', price: 120, category: 'Fresh Items', unit: 'per kg'),
+      BusinessItem(id: 'g1i6', name: 'Onion (1kg)', description: 'Red onion fresh', price: 80, category: 'Fresh Items', unit: 'per kg'),
       BusinessItem(
         id: 'g1p1',
         name: 'Monthly Ration Pack (Mini)',
         description: 'Essentials bundle for small family',
         price: 4999,
-        category: 'Packages',
+        category: 'Packaged & Ready Food',
         includes: ['Basmati rice', 'Cooking oil', 'Daal', 'Tea'],
         unit: 'per pack',
       ),
@@ -344,10 +348,10 @@ final List<Business> allDummyBusinesses = [
     rating: 4.1, reviewCount: 64, color: const Color(0xFF4CAF50),
     tagline: 'Your neighbourhood store',
     items: const [
-      BusinessItem(id: 'g2i1', name: 'Bread Loaf', description: 'Soft white sandwich bread', price: 120, category: 'Bakery'),
-      BusinessItem(id: 'g2i2', name: 'Butter (200g)', description: 'Salted / unsalted', price: 350, category: 'Dairy'),
-      BusinessItem(id: 'g2i3', name: 'Chicken (1kg)', description: 'Fresh broiler chicken', price: 520, category: 'Meat', unit: 'per kg'),
-      BusinessItem(id: 'g2i4', name: 'Mineral Water (6 pack)', description: '500ml bottles', price: 280, category: 'Beverages'),
+      BusinessItem(id: 'g2i1', name: 'Bread Loaf', description: 'Soft white sandwich bread', price: 120, category: 'Snacks & Bakery'),
+      BusinessItem(id: 'g2i2', name: 'Butter (200g)', description: 'Salted / unsalted', price: 350, category: 'Dairy & Drinks'),
+      BusinessItem(id: 'g2i3', name: 'Chicken (1kg)', description: 'Fresh broiler chicken', price: 520, category: 'Fresh Items', unit: 'per kg'),
+      BusinessItem(id: 'g2i4', name: 'Mineral Water (6 pack)', description: '500ml bottles', price: 280, category: 'Dairy & Drinks'),
     ],
   ),
 
@@ -356,6 +360,7 @@ final List<Business> allDummyBusinesses = [
     id: 's1', businessTypeId: 'salon', isOpen: true,
     name: 'Glamour Studio', address: 'Block 7, Gulshan-e-Iqbal, Karachi',
     rating: 4.8, reviewCount: 124, color: const Color(0xFFE91E63),
+    imageUrl: 'https://images.unsplash.com/photo-1633612632991-f5fef2f0f5e5?w=300&h=300&fit=crop',
     tagline: 'Where beauty meets perfection',
     items: const [
       BusinessItem(id: 's1i1', name: 'Haircut & Styling', description: 'Professional cut with blow dry', price: 800, category: 'Hair', durationMinutes: 45),
@@ -403,6 +408,7 @@ final List<Business> allDummyBusinesses = [
     id: 'gy1', businessTypeId: 'gym', isOpen: true,
     name: 'Fitness Force', address: 'Gulberg, Lahore',
     rating: 4.6, reviewCount: 143, color: const Color(0xFFFF9800),
+    imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=300&fit=crop',
     tagline: 'Your transformation starts here',
     items: const [
       BusinessItem(id: 'gy1i1', name: 'Monthly Membership', description: 'Unlimited gym access', price: 3500, category: 'Memberships', unit: 'per month'),
@@ -485,6 +491,7 @@ final List<Business> allDummyBusinesses = [
     deliveryBaseCharge: 50, deliveryPerKmCharge: 15,
     name: 'Espresso Yourself', address: 'Zamzama, Karachi',
     rating: 4.8, reviewCount: 267, color: const Color(0xFF795548),
+    imageUrl: 'https://images.unsplash.com/photo-1554118811-1e0d58224e24?w=300&h=300&fit=crop',
     tagline: 'Life\'s too short for bad coffee',
     items: const [
       BusinessItem(id: 'cf1i1', name: 'Cappuccino', description: 'Espresso with steamed milk foam', price: 380, category: 'Coffee'),
@@ -527,6 +534,7 @@ final List<Business> allDummyBusinesses = [
     id: 'bp1', businessTypeId: 'beauty', isOpen: true,
     name: 'Nadia\'s Beauty Lounge', address: 'Gulshan-e-Iqbal Block 13, Karachi',
     rating: 4.9, reviewCount: 312, color: const Color(0xFFFF4081),
+    imageUrl: 'https://images.unsplash.com/photo-1596728256218-7a4a2ecc3a6e?w=300&h=300&fit=crop',
     tagline: 'Glow up with confidence',
     phone: '0312-3456789',
     items: const [
@@ -558,6 +566,7 @@ final List<Business> allDummyBusinesses = [
     deliveryBaseCharge: 100, deliveryPerKmCharge: 20,
     name: 'Gulzar Flowers', address: 'Zamzama, Karachi',
     rating: 4.6, reviewCount: 87, color: const Color(0xFF8BC34A),
+    imageUrl: 'https://images.unsplash.com/photo-1545677568-2199f6e3f5ef?w=300&h=300&fit=crop',
     tagline: 'Fresh flowers, fresh feelings',
     phone: '0333-2345678',
     items: const [
@@ -575,6 +584,7 @@ final List<Business> allDummyBusinesses = [
     id: 'rc1', businessTypeId: 'rentacar', isOpen: true,
     name: 'Pak Rent a Car', address: 'Clifton, Karachi',
     rating: 4.4, reviewCount: 156, color: const Color(0xFF607D8B),
+    imageUrl: 'https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?w=300&h=300&fit=crop',
     tagline: 'Drive your journey',
     phone: '0311-4567890',
     items: const [
@@ -605,6 +615,7 @@ final List<Business> allDummyBusinesses = [
     id: 'mec1', businessTypeId: 'mechanic', isOpen: true,
     name: 'Ali Auto Workshop', address: 'Liaquatabad, Karachi',
     rating: 4.5, reviewCount: 234, color: const Color(0xFF455A64),
+    imageUrl: 'assets/branding/mechanic_workshop.jpg',
     tagline: 'Car & bike experts',
     phone: '0300-1234567',
     items: const [
@@ -626,47 +637,6 @@ final List<Business> allDummyBusinesses = [
       BusinessItem(id: 'mec2i1', name: 'AC Gas Refill', description: 'Car AC gas recharge', price: 3500, category: 'Car Repair', durationMinutes: 45),
       BusinessItem(id: 'mec2i2', name: 'Brake Service', description: 'Brake pads + oil flush', price: 3000, category: 'Car Repair', durationMinutes: 60),
       BusinessItem(id: 'mec2i3', name: 'Mobile Puncture (Doorstep)', description: 'We come to you', price: 400, category: 'Puncture', durationMinutes: 20),
-    ],
-  ),
-
-  // ── HOME SERVICES ──────────────────────────────────────────────────────────
-  Business(
-    id: 'hs1', businessTypeId: 'homeservice', isOpen: true,
-    name: 'Hassan Electric Works', address: 'North Nazimabad, Karachi',
-    rating: 4.6, reviewCount: 189, color: const Color(0xFF5C6BC0),
-    tagline: 'Licensed electrician available 24/7',
-    phone: '0333-5678901',
-    items: const [
-      BusinessItem(id: 'hs1i1', name: 'Wiring Repair', description: 'Fault finding + wiring fix', price: 1000, category: 'Electrician', durationMinutes: 60),
-      BusinessItem(id: 'hs1i2', name: 'MCB / Circuit Breaker', description: 'Replacement with new MCB', price: 800, category: 'Electrician', durationMinutes: 30),
-      BusinessItem(id: 'hs1i3', name: 'AC Installation', description: 'Split AC install with bracket', price: 2500, category: 'AC Repair', durationMinutes: 120),
-      BusinessItem(id: 'hs1i4', name: 'Fan Installation', description: 'Ceiling fan wiring + install', price: 600, category: 'Electrician', durationMinutes: 30),
-    ],
-  ),
-  Business(
-    id: 'hs2', businessTypeId: 'homeservice', isOpen: true,
-    name: 'Rehman Plumbing & Gas', address: 'Gulberg, Lahore',
-    rating: 4.4, reviewCount: 143, color: const Color(0xFF5C6BC0),
-    tagline: 'Pipes, leaks & gas experts',
-    phone: '0300-8765432',
-    items: const [
-      BusinessItem(id: 'hs2i1', name: 'Tap / Faucet Repair', description: 'Leaking tap fix or replacement', price: 500, category: 'Plumber', durationMinutes: 30),
-      BusinessItem(id: 'hs2i2', name: 'Pipe Leakage Repair', description: 'Underground / wall pipe repair', price: 1500, category: 'Plumber', durationMinutes: 90),
-      BusinessItem(id: 'hs2i3', name: 'Geyser Installation', description: 'New geyser with gas fitting', price: 1500, category: 'Plumber', durationMinutes: 60),
-      BusinessItem(id: 'hs2i4', name: 'Lock Change', description: 'New lock fitting, any door', price: 800, category: 'Locksmith', durationMinutes: 30),
-      BusinessItem(id: 'hs2i5', name: 'Lock Opening (Emergency)', description: 'Locked out of house / car', price: 500, category: 'Locksmith', durationMinutes: 20),
-    ],
-  ),
-  Business(
-    id: 'hs3', businessTypeId: 'homeservice', isOpen: false,
-    name: 'Quick Fix Home Care', address: 'F-10, Islamabad',
-    rating: 4.5, reviewCount: 98, color: const Color(0xFF5C6BC0),
-    tagline: 'All home repair solutions',
-    phone: '0311-2345670',
-    items: const [
-      BusinessItem(id: 'hs3i1', name: 'Wall Painting (per room)', description: 'Labour + paint included', price: 8000, category: 'Painter', durationMinutes: 480),
-      BusinessItem(id: 'hs3i2', name: 'Carpenter (Door / Window)', description: 'Repair or new fitting', price: 2000, category: 'Carpenter', durationMinutes: 120),
-      BusinessItem(id: 'hs3i3', name: 'AC Servicing (Split)', description: 'Full clean + gas check + drain', price: 2000, category: 'AC Repair', durationMinutes: 90),
     ],
   ),
 

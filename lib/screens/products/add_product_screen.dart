@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/grocery_categories.dart';
 import '../../models/product.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/product_provider.dart';
@@ -24,11 +25,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _descCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _discountCtrl = TextEditingController();
-  final _durationCtrl = TextEditingController();
+  /// Pharmacy: minimum cart total (Rs.) for slab discount.
+  final _minOrderCtrl = TextEditingController();
   String? _selectedCategory;
   String _selectedUnit = 'per piece';
   bool _hasDiscount = false;
   bool _isBundle = false;
+  bool _isRamzanSpecial = false;
+  bool _isValentinesSpecial = false;
   final List<String> _bundleItems = [];
   final ImagePicker _imagePicker = ImagePicker();
   String? _pickedImagePath;
@@ -43,16 +47,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
     'per bottle', 'per dozen', 'per litre', 'per box',
   ];
 
-  static const _shopSuggestedNames = [
-    'Cooking Oil',
-    'Ghee',
-    'Rice',
-    'Daal',
-    'Flour (Aata)',
-    'Sugar',
-    'Tea',
-    'Milk',
-    'Spices',
+  static const _flowerUnits = [
+    'per bouquet', 'per arrangement', 'per dozen',
+    'per bunch', 'per set', 'per package',
+  ];
+
+  static const _flowerSuggestedNames = [
+    'Red Rose Bouquet',
+    'Mehndi Flowers Package',
+    'Shadi Decoration Package',
+    'Bridal Bouquet',
+    'Henna Ceremony Flowers',
+    'Wedding Centerpiece',
+    'Table Arrangement',
+    'Gift Basket',
+    'Birthday Flowers',
   ];
 
   Future<void> _pickPhotoFromGallery() async {
@@ -125,7 +134,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _descCtrl.dispose();
     _priceCtrl.dispose();
     _discountCtrl.dispose();
-    _durationCtrl.dispose();
+    _minOrderCtrl.dispose();
     super.dispose();
   }
 
@@ -141,6 +150,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
+    final isPharmacyCheck = bizId == 'pharmacy';
     if (_isBundle && _bundleItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -151,12 +161,55 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
+    if (isPharmacyCheck && _hasDiscount) {
+      final minO = double.tryParse(_minOrderCtrl.text);
+      final d = double.tryParse(_discountCtrl.text);
+      if (minO == null || minO <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enter minimum bill amount (Rs.) for this discount slab'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+        return;
+      }
+      if (d == null || d <= 0 || d >= 100) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enter discount between 1 and 99%'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+        return;
+      }
+    }
+
     final isService = _isServiceBiz(bizId);
     final isFood = _isFoodBiz(bizId);
     final isShop = _isShopBiz(bizId);
     final isGym = _isGymBiz(bizId);
     final isGymMembership = _isGymMembership(bizId);
     final isRentacar = _isRentacarBiz(bizId);
+    final isPharmacy = bizId == 'pharmacy';
+    final isClinic = bizId == 'clinic';
+    final allowBundle = !isClinic &&
+        !isPharmacy &&
+        (isFood || isGym || (isShop && !isPharmacy));
+
+    double discount = 0;
+    double? minOrderDisc;
+    if (isPharmacy && _hasDiscount) {
+      discount = double.tryParse(_discountCtrl.text) ?? 0;
+      minOrderDisc = double.tryParse(_minOrderCtrl.text);
+    } else if (!isClinic && _hasDiscount) {
+      if (isGym ||
+          isFood ||
+          isRentacar ||
+          (isShop && !isPharmacy) ||
+          (isService && !isGym)) {
+        discount = double.tryParse(_discountCtrl.text) ?? 0;
+      }
+    }
 
     final product = Product(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -165,13 +218,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
       description: _descCtrl.text.trim(),
       price: double.tryParse(_priceCtrl.text) ?? 0,
       category: _selectedCategory!,
-      discountPercent: (isFood || isGym || isShop || isService || isRentacar) &&
-              _hasDiscount
-          ? (double.tryParse(_discountCtrl.text) ?? 0)
-          : 0,
-      durationMinutes: (isService && !isGymMembership) && _durationCtrl.text.isNotEmpty
-          ? int.tryParse(_durationCtrl.text)
-          : null,
+      discountPercent: discount,
+      durationMinutes: null,
       unit: isGymMembership
           ? _gymPackageDuration
           : (isGym && _selectedCategory != 'Assessment')
@@ -184,8 +232,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           : 'per day')
                       : null,
       withTrainer: isGymMembership ? _gymWithTrainer : null,
+      minOrderForDiscount: isPharmacy ? minOrderDisc : null,
+      isRamzanSpecial: _showRamzanToggle(bizId) && _isRamzanSpecial,
+      isValentinesSpecial: _isValentinesSpecial,
       imageUrl: _pickedImagePath ?? '',
-      bundleItems: _isBundle ? List.unmodifiable(_bundleItems) : const [],
+      bundleItems:
+          (_isBundle && allowBundle) ? List.unmodifiable(_bundleItems) : const [],
     );
 
     context.read<ProductProvider>().addProduct(product);
@@ -277,16 +329,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   bool _isServiceBiz(String id) =>
-      ['salon', 'gym', 'clinic', 'beauty', 'mechanic', 'homeservice', 'petcare']
+      ['salon', 'gym', 'clinic', 'beauty', 'mechanic', 'petcare']
           .contains(id);
   bool _isFoodBiz(String id) =>
       ['restaurant', 'cafe'].contains(id);
   bool _isShopBiz(String id) =>
       ['grocery', 'pharmacy', 'others', 'flowers'].contains(id);
+  bool _isFlowerShop(String id) => id == 'flowers';
   bool _isRentacarBiz(String id) => id == 'rentacar';
   bool _isGymBiz(String id) => id == 'gym';
   bool _isGymMembership(String bizId) =>
       _isGymBiz(bizId) && _selectedCategory == 'Memberships';
+
+  /// Ramzan toggle only for food/grocery-style shops (not pharmacy, gym, clinic, salon, etc.).
+  bool _showRamzanToggle(String id) =>
+      ['restaurant', 'cafe', 'grocery', 'others'].contains(id);
 
   Future<void> _pickBundleItems(
     BuildContext context, {
@@ -363,6 +420,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final isGym = _isGymBiz(bizId);
     final isGymMembership = _isGymMembership(bizId);
     final isRentacar = _isRentacarBiz(bizId);
+    final isPharmacy = bizId == 'pharmacy';
+    final isClinic = bizId == 'clinic';
+    final showBundle = !isClinic &&
+        !isPharmacy &&
+        (isFood || isGym || (isShop && !isPharmacy));
+    final showStandardDiscount = !isPharmacy &&
+        !isGym &&
+        !isClinic &&
+        (isFood ||
+            isRentacar ||
+            (isShop && !isPharmacy) ||
+            (isService && !isGym && !isClinic));
     final bizColor = biz.themeColor;
     final existing = bizId.isEmpty
         ? productProv.products
@@ -380,7 +449,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Text(appBarTitle),
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
       ),
@@ -456,23 +525,37 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _openImageLibrary(
-                        businessTypeId: bizId.isEmpty
-                            ? (biz.selectedBusiness?.id ?? 'others')
-                            : bizId,
-                        accent: bizColor,
+                    child: SizedBox(
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openImageLibrary(
+                          businessTypeId: bizId.isEmpty
+                              ? (biz.selectedBusiness?.id ?? 'others')
+                              : bizId,
+                          accent: bizColor,
+                        ),
+                        icon: const Icon(Icons.photo_library_outlined, size: 20),
+                        label: const Text('Library'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
-                      icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Open Image Library'),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _pickPhotoFromGallery,
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                      label: const Text('Upload photo'),
+                    child: SizedBox(
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        onPressed: _pickPhotoFromGallery,
+                        icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
+                        label: const Text('Upload'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -482,7 +565,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Suggested images (tap to select)',
+                    _isFlowerShop(bizId) ? 'Wedding & Event Packages' : 'Suggested items (tap to select)',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -495,10 +578,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   height: 92,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: _shopSuggestedNames.length,
+                    itemCount: _isFlowerShop(bizId)
+                        ? _flowerSuggestedNames.length
+                        : GroceryCategories.allSuggestedProductNames.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 10),
                     itemBuilder: (_, i) {
-                      final name = _shopSuggestedNames[i];
+                      final names = _isFlowerShop(bizId)
+                          ? _flowerSuggestedNames
+                          : GroceryCategories.allSuggestedProductNames;
+                      final name = names[i];
                       final selected = _suggestedImageName == name;
                       return GestureDetector(
                         onTap: () => _selectSuggestedImage(name),
@@ -612,78 +700,173 @@ class _AddProductScreenState extends State<AddProductScreen> {
               const SizedBox(height: 16),
 
               // ── Package / Combo builder ───────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.all_inclusive_rounded,
-                            color: bizColor, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            isFood ? 'Combo' : 'Package',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                              fontSize: 14,
+              if (showBundle) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.all_inclusive_rounded,
+                              color: bizColor, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isFood ? 'Combo' : 'Package',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
-                        ),
-                        Switch(
-                          value: _isBundle,
-                          activeColor: bizColor,
-                          onChanged: (v) => setState(() {
-                            _isBundle = v;
-                            if (!v) _bundleItems.clear();
-                          }),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      isFood
-                          ? 'Enable to create a combo that includes multiple items.'
-                          : 'Enable to create a package (e.g. Ramzan package) that includes multiple items.',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    if (_isBundle) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          ..._bundleItems.map((t) => Chip(
-                                label: Text(t),
-                                onDeleted: () => setState(() => _bundleItems.remove(t)),
-                              )),
-                          ActionChip(
-                            label: Text(isFood ? '+ Add combo items' : '+ Add package items'),
-                            avatar: const Icon(Icons.add_rounded, size: 18),
-                            onPressed: () => _pickBundleItems(
-                              context,
-                              existing: existing,
-                            ),
+                          Switch(
+                            value: _isBundle,
+                            activeColor: bizColor,
+                            onChanged: (v) => setState(() {
+                              _isBundle = v;
+                              if (!v) _bundleItems.clear();
+                            }),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
                       Text(
-                        'Included items: ${_bundleItems.length}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+                        isFood
+                            ? 'Enable to create a combo that includes multiple items.'
+                            : 'Enable to bundle multiple items in one package.',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      if (_isBundle) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ..._bundleItems.map((t) => Chip(
+                                  label: Text(t),
+                                  onDeleted: () =>
+                                      setState(() => _bundleItems.remove(t)),
+                                )),
+                            ActionChip(
+                              label: Text(isFood
+                                  ? '+ Add combo items'
+                                  : '+ Add package items'),
+                              avatar: const Icon(Icons.add_rounded, size: 18),
+                              onPressed: () => _pickBundleItems(
+                                context,
+                                existing: existing,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Included items: ${_bundleItems.length}',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textHint),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // ── Ramzan Special / Valentine's Special Toggle ────────────────────────
+              if (_showRamzanToggle(bizId) && !_isFlowerShop(bizId))
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.celebration_rounded, color: bizColor, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Ramzan Special',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Mark this as Ramzan offer',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isRamzanSpecial,
+                        activeColor: bizColor,
+                        onChanged: (v) => setState(() => _isRamzanSpecial = v),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
+              if (_isFlowerShop(bizId))
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.favorite_rounded, color: Colors.red, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Valentine's Special",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "Mark this as Valentine's Day offer",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isValentinesSpecial,
+                        activeColor: Colors.red,
+                        onChanged: (v) => setState(() => _isValentinesSpecial = v),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 16),
 
               // ── Gym: Package duration + Trainer toggle ────────────────
@@ -781,19 +964,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                // Session duration for PT & Assessment
-                if (_selectedCategory == 'Personal Training' ||
-                    _selectedCategory == 'Assessment' ||
-                    _selectedCategory == 'Group Classes') ...[
-                  CustomTextField(
-                    label: 'Session Duration (minutes)',
-                    hint: 'e.g. 60',
-                    controller: _durationCtrl,
-                    keyboardType: TextInputType.number,
-                    prefixIcon: Icons.access_time_rounded,
-                  ),
-                  const SizedBox(height: 16),
-                ],
                 // Discount for all gym types
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -856,17 +1026,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-              // ── Non-gym service: Duration ──────────────────────────────
-              if (isService && !isGym) ...[
-                CustomTextField(
-                  label: 'Duration (minutes)',
-                  hint: 'e.g. 45',
-                  controller: _durationCtrl,
-                  keyboardType: TextInputType.number,
-                  prefixIcon: Icons.access_time_rounded,
-                ),
-                const SizedBox(height: 16),
-              ],
 
               // ── Shop: Unit ───────────────────────────────────────────
               if (isShop) ...[
@@ -880,7 +1039,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ..._units.map((u) {
+                    ...(_isFlowerShop(bizId) ? _flowerUnits : _units).map((u) {
                       final selected = _selectedUnit == u;
                       return GestureDetector(
                         onTap: () => setState(() => _selectedUnit = u),
@@ -916,8 +1075,72 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // ── Discount / Deal ───────────────────────────────────────
-              if (isFood || isShop || isService || isRentacar) ...[
+              // ── Pharmacy: discount slabs (min bill → %) ──────────────
+              if (isPharmacy) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: Colors.teal.withValues(alpha: 0.35)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.savings_outlined,
+                              color: bizColor, size: 20),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Discount slab',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary),
+                            ),
+                          ),
+                          Switch(
+                            value: _hasDiscount,
+                            onChanged: (v) => setState(() => _hasDiscount = v),
+                            activeThumbColor: bizColor,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Example: bill ≥ Rs. 5,000 → 5% off. Add one row per slab.',
+                        style: TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                      if (_hasDiscount) ...[
+                        const SizedBox(height: 12),
+                        CustomTextField(
+                          label: 'Minimum bill (Rs.)',
+                          hint: 'e.g. 5000',
+                          controller: _minOrderCtrl,
+                          keyboardType: TextInputType.number,
+                          prefixIcon: Icons.shopping_cart_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        CustomTextField(
+                          label: 'Discount %',
+                          hint: 'e.g. 5',
+                          controller: _discountCtrl,
+                          keyboardType: TextInputType.number,
+                          prefixIcon: Icons.percent_rounded,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // ── Discount / Deal (non-gym, non-clinic, non-pharmacy) ─
+              if (showStandardDiscount) ...[
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(

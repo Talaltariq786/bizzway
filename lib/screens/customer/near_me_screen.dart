@@ -28,7 +28,7 @@ const _categories = [
   _NearCategory(id: 'all',     label: 'All',          icon: Icons.grid_view_rounded,      color: Color(0xFF6C63FF), typeIds: []),
   _NearCategory(id: 'medical', label: 'Medical',      icon: Icons.local_hospital_rounded, color: Color(0xFFE53935), typeIds: ['clinic', 'pharmacy']),
   _NearCategory(id: 'auto',    label: 'Auto',         icon: Icons.build_rounded,          color: Color(0xFF455A64), typeIds: ['mechanic']),
-  _NearCategory(id: 'home',    label: 'Home Services',icon: Icons.handyman_rounded,       color: Color(0xFF5C6BC0), typeIds: ['homeservice']),
+
 ];
 
 // ── Emergency quick-dial entries ──────────────────────────────────────────────
@@ -71,12 +71,12 @@ class _NearMeScreenState extends State<NearMeScreen> {
   double _distFor(int index) => _fakeDist[index % _fakeDist.length];
 
   List<Business> get _filtered {
-    // Medical (clinics/pharmacy) always show; mechanic/homeservice only when online (isOpen)
+    // Medical (clinics/pharmacy) always show; mechanic only when online (isOpen)
     var list = allDummyBusinesses.where((b) {
       if (b.businessTypeId == 'clinic' || b.businessTypeId == 'pharmacy') {
         return true;
       }
-      if (b.businessTypeId == 'mechanic' || b.businessTypeId == 'homeservice') {
+      if (b.businessTypeId == 'mechanic') {
         return b.isOpen; // isOpen acts as "provider is online"
       }
       return false;
@@ -122,7 +122,7 @@ class _NearMeScreenState extends State<NearMeScreen> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1A3A5C), Color(0xFF0D7377)],
+          colors: AppColors.gradientPrimary,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -359,6 +359,21 @@ class _NearMeScreenState extends State<NearMeScreen> {
     );
   }
 
+  String _getHintText(String businessTypeId) {
+    switch (businessTypeId) {
+      case 'mechanic':
+        return 'Describe your vehicle issue... (e.g., Car tyre puncture, Oil change needed, AC not working)';
+      case 'beauty':
+        return 'Describe your requirement... (e.g., Facial treatment, Waxing, Threading)';
+      case 'salon':
+        return 'Describe your service need... (e.g., Haircut, Hair coloring, Spa treatment)';
+      case 'petcare':
+        return 'Describe your pet care need... (e.g., Vet consultation, Grooming, Vaccination)';
+      default:
+        return 'Describe your issue or service need...';
+    }
+  }
+
   void _showRequestSheet(Business biz) {
     final issueCtrl = TextEditingController();
     final loc = context.read<LocationProvider>();
@@ -436,7 +451,7 @@ class _NearMeScreenState extends State<NearMeScreen> {
               controller: issueCtrl,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText: 'Describe your issue... (e.g. Car tyre puncture near gate)',
+                hintText: _getHintText(biz.businessTypeId),
                 hintStyle: const TextStyle(fontSize: 13),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14)),
@@ -534,7 +549,9 @@ class _ServiceCard extends StatelessWidget {
 
   bool get _canRequest =>
       biz.businessTypeId == 'mechanic' ||
-      biz.businessTypeId == 'homeservice';
+      biz.businessTypeId == 'beauty' ||
+      biz.businessTypeId == 'salon' ||
+      biz.businessTypeId == 'petcare';
 
   @override
   Widget build(BuildContext context) {

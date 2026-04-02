@@ -22,6 +22,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -36,59 +37,156 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen>
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Colors.white,
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-        ),
-        title: const Text('My Orders'),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1A3A5C), Color(0xFF0D7377)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: AppColors.gradientPrimary,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                ),
+              ),
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 12,
+                left: 20,
+                right: 20,
+                bottom: 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'My Orders',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Track and manage your orders',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        bottom: TabBar(
-          controller: _tabCtrl,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          dividerColor: Colors.transparent,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: [
-            const Tab(
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.grid_view_rounded, size: 14),
-                SizedBox(width: 5),
-                Text('Category'),
-              ]),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: const BoxDecoration(
+                    borderRadius: BorderRadius.all(Radius.circular(20)),
+                  gradient: LinearGradient(
+                    colors: AppColors.gradientPrimary,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: List.generate(4, (index) {
+                      final isSelected = _tabCtrl.index == index;
+                      final counts = [
+                        null,
+                        prov.pendingOrders.length,
+                        prov.activeOrders.length,
+                        prov.completedOrders.length,
+                      ];
+                      final labels = ['Category', 'Pending', 'Active', 'Delivered'];
+                      final icons = [Icons.grid_view_rounded, null, null, null];
+              
+                      return GestureDetector(
+                        onTap: () => _tabCtrl.animateTo(index),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (icons[index] != null) ...[
+                                Icon(icons[index], size: 14, color: isSelected ? AppColors.primary : Colors.white),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                labels[index],
+                                style: TextStyle(
+                                  color: isSelected ? AppColors.primary : Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                ),
+                              ),
+                              if (counts[index] != null && counts[index]! > 0) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE91E3F),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${counts[index]}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
             ),
-            Tab(text: 'Pending (${prov.pendingOrders.length})'),
-            Tab(text: 'Active (${prov.activeOrders.length})'),
-            Tab(text: 'Delivered (${prov.completedOrders.length})'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabCtrl,
-        children: [
-          // Tab 1: Category grid
-          _CategoryTab(billsByCategory: prov.billsByCategory),
-          // Tab 2: Pending orders
-          _OrderListTab(orders: prov.pendingOrders),
-          // Tab 3: Active orders
-          _OrderListTab(orders: prov.activeOrders),
-          // Tab 4: Delivered orders
-          _OrderListTab(orders: prov.completedOrders),
+          ),
+          SliverFillRemaining(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, left: 12, right: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
+                ),
+              ),
+              child: TabBarView(
+              controller: _tabCtrl,
+              children: [
+                // Tab 1: Category grid
+                _CategoryTab(billsByCategory: prov.billsByCategory),
+                // Tab 2: Pending orders
+                _OrderListTab(orders: prov.pendingOrders),
+                // Tab 3: Active orders
+                _OrderListTab(orders: prov.activeOrders),
+                // Tab 4: Delivered orders
+                _OrderListTab(orders: prov.completedOrders),
+              ],
+            ),
+            ),
+          ),
         ],
       ),
     );
@@ -111,7 +209,18 @@ class _CategoryTab extends StatelessWidget {
       );
     }
 
-    final ids = billsByCategory.keys.toList();
+    final ids = billsByCategory.keys
+        .where((id) => !BusinessType.excludedFromCustomerBrowse.contains(id))
+        .toList();
+
+    if (ids.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.store_outlined,
+        title: 'Browse categories mein koi bill nahi',
+        subtitle:
+            'Café / Others ke orders yahan category grid mein show nahi hote.\nBaqi tabs se orders dekh sakte hain.',
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
