@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Node API
+server/node_modules/
+server/data/bookings.json
+
+# Android flavors build outputs
+build/app/outputs/

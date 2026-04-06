@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../core/constants/grocery_categories.dart';
 
 class BusinessType {
@@ -104,7 +103,7 @@ class BusinessType {
         ),
         const BusinessType(
           id: 'rentacar',
-          title: 'Rent a Car',
+          title: 'Rent a Car', 
           icon: Icons.directions_car_rounded,
           imageUrl: 'https://via.placeholder.com/100?text=RentACar',
           categories: ['Economy', 'Sedan', 'SUV', 'Van', 'With Driver', 'Self Drive'],
