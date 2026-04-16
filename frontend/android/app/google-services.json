@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "153879482900",
+    "project_id": "bizzway-9ff88",
+    "storage_bucket": "bizzway-9ff88.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:153879482900:android:7dbd29f6a9613ac7c7cd01",
+        "android_client_info": {
+          "package_name": "com.saas.bizlabel_pro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSeQe4aE6bxeJkuakBh4tL0hiJLHySCNw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

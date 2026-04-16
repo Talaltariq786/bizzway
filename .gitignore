@@ -26,6 +26,7 @@ migrate_working_dir/
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
+frontend/build/
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
@@ -47,6 +48,14 @@ app.*.map.json
 # Node API
 server/node_modules/
 server/data/bookings.json
+
+# Bizzway backend (Node)
+bizzwaybackend/node_modules/
+bizzwaybackend/.env
+bizzwaybackend/dist/
+
+# Flutter frontend local env
+frontend/.env
 
 # Android flavors build outputs
 build/app/outputs/

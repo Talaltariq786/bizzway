@@ -1,19 +1,46 @@
-# bizlabel_pro
+## BizzWay (Monorepo)
 
-A new Flutter project.
+This repo is split into two separate apps:
 
-## Getting Started
+- `bizzwaybackend/` — Node.js + MongoDB REST API (source of truth)
+- `frontend/` — Flutter mobile app (customer/owner/rider)
 
-This project is a starting point for a Flutter application.
+### Backend (Node + Mongo)
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+cd bizzwaybackend
+npm install
+npm run dev
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Health check:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-# bizzway
-# bizzway
+```bash
+curl -s http://127.0.0.1:8080/health
+```
+
+### Frontend (Flutter)
+
+```bash
+cd frontend
+flutter pub get
+flutter run
+```
+
+#### Running on a physical phone (iPhone/Android)
+
+If you run the API on your Mac/PC, **do not use `127.0.0.1` on a physical phone**.
+Set the backend base URL to your machine’s LAN IP:
+
+- In the app: Login screen → bottom **`API:`** row → set `http://<your-ip>:8080`
+- Or via build flag:
+
+```bash
+cd frontend
+flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8080
+```
+
+### Legacy
+
+`server/` is an older demo backend (port 3000). It is not used by the current app.
+

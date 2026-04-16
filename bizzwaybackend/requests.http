@@ -1,0 +1,90 @@
+### Health
+GET http://localhost:8080/health
+
+### Register (owner)
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "phone": "03000000001",
+  "password": "123456",
+  "role": "businessOwner",
+  "name": "Owner One"
+}
+
+### Login
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "03000000001",
+  "password": "123456"
+}
+
+### Create business (set Bearer token)
+POST http://localhost:8080/api/businesses
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Test Restaurant",
+  "type": "restaurant",
+  "address": "Karachi",
+  "lat": 24.8607,
+  "lng": 67.0011
+}
+
+### Me
+GET http://localhost:8080/api/me
+Authorization: Bearer {{accessToken}}
+
+### Addresses (add)
+POST http://localhost:8080/api/me/addresses
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "id": "home",
+  "label": "Home",
+  "address": "Block 6, PECHS, Karachi",
+  "lat": 24.8607,
+  "lng": 67.0011
+}
+
+### Addresses (select)
+PATCH http://localhost:8080/api/me/addresses/home/select
+Authorization: Bearer {{accessToken}}
+
+### Upload stub
+POST http://localhost:8080/api/uploads
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "purpose": "product_image",
+  "filename": "biryani.png",
+  "contentType": "image/png"
+}
+
+### Save FCM token
+POST http://localhost:8080/api/push-tokens
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "token": "{{fcmToken}}",
+  "platform": "ios",
+  "app": "customer"
+}
+
+### Test push (send to token)
+POST http://localhost:8080/api/push/test
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "token": "{{fcmToken}}",
+  "title": "BizzWay",
+  "body": "Job near you (test)"
+}
+
