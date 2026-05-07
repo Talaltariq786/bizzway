@@ -18,6 +18,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/rider_team_provider.dart';
+import '../../providers/service_provider_directory_provider.dart';
 import '../../providers/theme_provider.dart';
 
 class AppProviders extends StatelessWidget {
@@ -43,6 +44,7 @@ class AppProviders extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RiderTeamProvider()),
         ChangeNotifierProvider(create: (_) => GymManagementProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
+        ChangeNotifierProvider(create: (_) => ServiceProviderDirectoryProvider()),
         ChangeNotifierProvider(create: (_) => NearMeUiNotifier()),
         ChangeNotifierProvider(create: (_) => CustomerHomeUiNotifier()),
         ChangeNotifierProvider(create: (_) => CustomerProfileNotifier()),

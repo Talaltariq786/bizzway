@@ -15,8 +15,9 @@ async function main() {
   }
 
   const app = createApp({ corsOrigin: env.CORS_ORIGIN, env });
-  app.listen(env.PORT, () => {
-    console.log(`API listening on http://localhost:${env.PORT}`);
+  const host = process.env.HOST ?? '0.0.0.0';
+  app.listen(env.PORT, host, () => {
+    console.log(`API listening on http://${host}:${env.PORT}`);
   });
 }
 

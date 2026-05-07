@@ -4,6 +4,7 @@ import '../core/constants/app_strings.dart';
 import '../core/routes/app_routes.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../screens/service_worker/scrap_rates_editor_screen.dart';
 import '../screens/service_worker/service_worker_home_screen.dart';
 import 'common/app_providers.dart';
 import 'common/role_login_screens.dart';
@@ -36,6 +37,8 @@ class HomeServicesApp extends StatelessWidget {
                 ),
             AppRoutes.login: (_) => const HomeServicesLoginScreen(),
             AppRoutes.serviceWorkerHome: (_) => const ServiceWorkerHomeScreen(),
+            AppRoutes.scrapRatesEditor: (_) =>
+                const ScrapRatesEditorScreen(),
           },
         ),
       ),

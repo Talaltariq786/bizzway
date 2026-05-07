@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -7,10 +9,11 @@ import '../../core/utils/app_toast.dart';
 import '../../core/utils/dev_log.dart';
 import '../../core/utils/maps.dart';
 import '../../models/order.dart';
+import '../../providers/business_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../providers/order_provider.dart';
 
-class RiderAssignedOrderDetailScreen extends StatelessWidget {
+class RiderAssignedOrderDetailScreen extends StatefulWidget {
   final Order order;
   final bool isPoolOrder;
 
@@ -20,8 +23,26 @@ class RiderAssignedOrderDetailScreen extends StatelessWidget {
     required this.isPoolOrder,
   });
 
+  @override
+  State<RiderAssignedOrderDetailScreen> createState() =>
+      _RiderAssignedOrderDetailScreenState();
+}
+
+class _RiderAssignedOrderDetailScreenState
+    extends State<RiderAssignedOrderDetailScreen> {
+  final MapController _mapController = MapController();
+  bool _routeMapOpen = false;
+
+  Order get _o => widget.order;
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
   Future<void> _callCustomer(BuildContext context) async {
-    final phone = order.customerPhone.trim();
+    final phone = _o.customerPhone.trim();
     if (phone.isEmpty) return;
     final uri = Uri(scheme: 'tel', path: phone);
     if (await canLaunchUrl(uri)) {
@@ -35,15 +56,36 @@ class RiderAssignedOrderDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final o = order;
-    final accent = isPoolOrder ? AppColors.primary : AppColors.info;
+    final o = _o;
+    final accent = widget.isPoolOrder ? AppColors.primary : AppColors.info;
     final canMarkDelivered =
         o.status != OrderStatus.completed && o.status != OrderStatus.cancelled;
+
+    final biz = context.watch<BusinessProvider>();
+    final pickup = LatLng(biz.businessLat, biz.businessLng);
+    final dropLat = o.customerLat;
+    final dropLng = o.customerLng;
+    LatLng? drop;
+    if (dropLat != null && dropLng != null) {
+      drop = LatLng(dropLat, dropLng);
+    }
+    final hasRouteCoords = drop != null;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Delivery detail'),
+        actions: [
+          if (hasRouteCoords)
+            TextButton.icon(
+              onPressed: () => setState(() => _routeMapOpen = !_routeMapOpen),
+              icon: Icon(
+                _routeMapOpen ? Icons.expand_less : Icons.map_rounded,
+                size: 20,
+              ),
+              label: Text(_routeMapOpen ? 'Map band karein' : 'Route map'),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -127,18 +169,74 @@ class RiderAssignedOrderDetailScreen extends StatelessWidget {
           const SizedBox(height: 12),
           _section(
             title: 'Drop-off address',
-            child: Text(
-              (o.customerAddress ?? '').trim().isEmpty
-                  ? '—'
-                  : o.customerAddress!,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: hasRouteCoords
+                      ? () => setState(() => _routeMapOpen = !_routeMapOpen)
+                      : null,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            (o.customerAddress ?? '').trim().isEmpty
+                                ? '—'
+                                : o.customerAddress!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (hasRouteCoords) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            _routeMapOpen
+                                ? Icons.expand_less_rounded
+                                : Icons.route_rounded,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                if (!hasRouteCoords) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Is order ke drop coordinates save nahi — sirf text address.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textSecondary.withValues(alpha: 0.95),
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _routeMapOpen
+                        ? 'Shop pin se customer drop tak seedha route (demo line).'
+                        : 'Address par tap karein — map par pickup → drop line.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textSecondary.withValues(alpha: 0.95),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
+          if (_routeMapOpen && drop != null) ...[
+            const SizedBox(height: 12),
+            _routeMapCard(pickup, drop),
+          ],
           const SizedBox(height: 12),
           _section(
             title: 'Bill',
@@ -241,6 +339,113 @@ class RiderAssignedOrderDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _routeMapCard(LatLng pickup, LatLng drop) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFE8E8ED)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          SizedBox(
+            height: 260,
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                backgroundColor: const Color(0xFFF2F3F7),
+                initialCameraFit: CameraFit.bounds(
+                  bounds: LatLngBounds(pickup, drop),
+                  padding: const EdgeInsets.fromLTRB(36, 44, 36, 52),
+                ),
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                  subdomains: const ['a', 'b', 'c', 'd'],
+                  userAgentPackageName: 'com.bizzway.bizlabel',
+                  maxZoom: 20,
+                  maxNativeZoom: 20,
+                  retinaMode: true,
+                ),
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: [pickup, drop],
+                      color: const Color(0x40000000),
+                      strokeWidth: 9,
+                    ),
+                    Polyline(
+                      points: [pickup, drop],
+                      color: const Color(0xFF5B4FCF),
+                      strokeWidth: 4,
+                    ),
+                  ],
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: pickup,
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: _MapPin(
+                        icon: Icons.storefront_rounded,
+                        color: AppColors.primary,
+                        ring: Colors.white,
+                      ),
+                    ),
+                    Marker(
+                      point: drop,
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: _MapPin(
+                        icon: Icons.location_on_rounded,
+                        color: AppColors.error,
+                        ring: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 6,
+            child: IgnorePointer(
+              child: Text(
+                'Pickup (shop pin) → drop · © CARTO © OSM',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Colors.grey.shade800,
+                  shadows: const [
+                    Shadow(color: Colors.white, blurRadius: 6),
+                    Shadow(color: Colors.white, blurRadius: 2),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _section({required String title, required Widget child}) {
     return Container(
       width: double.infinity,
@@ -303,3 +508,33 @@ class RiderAssignedOrderDetailScreen extends StatelessWidget {
   }
 }
 
+class _MapPin extends StatelessWidget {
+  const _MapPin({
+    required this.icon,
+    required this.color,
+    required this.ring,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color ring;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: ring,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+}

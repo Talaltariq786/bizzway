@@ -34,8 +34,16 @@ class _OrdersScreenState extends State<OrdersScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    final start = widget.initialOrdersTabIndex;
+    final idx = start != null && start >= 0 && start < 5 ? start : 0;
+    _tabController = TabController(length: 5, vsync: this, initialIndex: idx);
     _tabController.addListener(() => setState(() {}));
+    if (start != null && start >= 0 && start < 5) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onInitialOrdersTabApplied?.call();
+      });
+    }
   }
 
   @override

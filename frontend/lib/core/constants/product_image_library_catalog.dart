@@ -1,6 +1,6 @@
 /// Suggested names for [ProductImageLibraryScreen]: top tabs + optional **sub-tabs**
 /// (e.g. Burgers → Chicken / Beef / Fish) with Pakistan-style wording.
-library product_image_library_catalog;
+library;
 
 abstract final class ProductImageLibraryCatalog {
   ProductImageLibraryCatalog._();

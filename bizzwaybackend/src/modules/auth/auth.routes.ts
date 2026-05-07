@@ -14,19 +14,17 @@ export function authRouter(env: Env) {
   r.post('/register', async (req, res, next) => {
     try {
       const body = RegisterSchema.parse(req.body);
-      if (!body.phone && !body.email) {
-        return res.status(400).json({ error: 'phone_or_email_required' });
-      }
 
       const passwordHash = await hashPassword(body.password);
       const roles: Role[] = [body.role];
+      const fullName = body.name.trim();
 
       const user = await UserModel.create({
         phone: body.phone?.trim(),
         email: body.email?.trim()?.toLowerCase(),
         passwordHash,
         roles,
-        name: body.name?.trim(),
+        name: fullName,
       });
 
       const payload: JwtPayload = { sub: user._id.toString(), roles };

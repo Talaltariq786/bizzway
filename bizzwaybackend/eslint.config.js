@@ -3,6 +3,9 @@ import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
+  {
+    ignores: ['dist/**'],
+  },
   js.configs.recommended,
   {
     files: ['**/*.{ts,mts}'],

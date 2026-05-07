@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/api/api_client.dart';
+import '../core/api/subscription_api.dart';
+import '../core/utils/dev_log.dart';
 import '../core/api/api_paths.dart';
 import '../core/config/offline_mode.dart';
 import '../models/business_type.dart';
@@ -18,6 +21,13 @@ class BusinessProvider extends ChangeNotifier {
   String? _remoteBusinessMongoId;
   String _businessName = 'My Business';
   String _businessAddress = '';
+  String _businessCoverImagePath = '';
+  /// Shop pin for listings & `POST /api/businesses` (Atlas geo index).
+  static const double defaultBusinessLat = 24.8607;
+  static const double defaultBusinessLng = 67.0011;
+  double _businessLat = defaultBusinessLat;
+  double _businessLng = defaultBusinessLng;
+  bool _businessPinConfirmed = false;
   Color _themeColor = const Color(0xFF6C63FF);
   TimeOfDay _openTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _closeTime = const TimeOfDay(hour: 22, minute: 0);
@@ -26,9 +36,13 @@ class BusinessProvider extends ChangeNotifier {
   double _deliveryPerKmCharge = 20.0;
   bool _isOnline = false;
   String _subscriptionPlan = 'free'; // 'free' | 'starter' | 'pro' | 'business'
+  DateTime? _subscriptionExpiresAt;
   List<String> _customCategories = const [];
   /// Unique per install; encoded in store QR / order link (persisted).
   String _storeQrToken = '';
+  /// Owner: force shop "closed" for customers even if time range says open.
+  bool _shopManuallyClosed = false;
+  String _shopClosedReason = '';
 
   BusinessType? get selectedBusiness => _selectedBusiness;
 
@@ -36,6 +50,10 @@ class BusinessProvider extends ChangeNotifier {
   String? get remoteBusinessMongoId => _remoteBusinessMongoId;
   String get businessName => _businessName;
   String get businessAddress => _businessAddress;
+  String get businessCoverImagePath => _businessCoverImagePath;
+  double get businessLat => _businessLat;
+  double get businessLng => _businessLng;
+  bool get businessPinConfirmed => _businessPinConfirmed;
   String get businessLogo => '';
   Color get themeColor => _themeColor;
   List<String> get categories {
@@ -56,9 +74,13 @@ class BusinessProvider extends ChangeNotifier {
   double get deliveryPerKmCharge => _deliveryPerKmCharge;
   bool get isOnline => _isOnline;
   String get subscriptionPlan => _subscriptionPlan;
+  DateTime? get subscriptionExpiresAt => _subscriptionExpiresAt;
 
   /// Field / Near Me jobs (auto workshop only). Salon/beauty use open hours, not this toggle.
   bool get isNearMeType => _selectedBusiness?.id == 'mechanic';
+
+  bool get shopManuallyClosed => _shopManuallyClosed;
+  String get shopClosedReason => _shopClosedReason;
 
   /// Calculates total delivery charge for a given distance
   double deliveryChargeFor(double distanceKm) {
@@ -67,6 +89,7 @@ class BusinessProvider extends ChangeNotifier {
   }
 
   bool get isCurrentlyOpen {
+    if (_shopManuallyClosed) return false;
     final now = TimeOfDay.now();
     final nowMins = now.hour * 60 + now.minute;
     final openMins = _openTime.hour * 60 + _openTime.minute;
@@ -110,6 +133,7 @@ class BusinessProvider extends ChangeNotifier {
     final businessId = prefs.getString('business_id');
     final name = prefs.getString('business_name');
     final address = prefs.getString('business_address');
+    final cover = prefs.getString('business_cover_image_path');
     final openH = prefs.getInt('open_hour');
     final openM = prefs.getInt('open_min');
     final closeH = prefs.getInt('close_hour');
@@ -128,6 +152,15 @@ class BusinessProvider extends ChangeNotifier {
     _remoteBusinessMongoId = prefs.getString(_prefsRemoteMongoId);
     if (name != null) _businessName = name;
     if (address != null) _businessAddress = address;
+    if (cover != null) _businessCoverImagePath = cover;
+    final lat = prefs.getDouble('business_lat');
+    final lng = prefs.getDouble('business_lng');
+    if (lat != null && lng != null) {
+      _businessLat = lat;
+      _businessLng = lng;
+    }
+    _businessPinConfirmed =
+        prefs.getBool('business_pin_confirmed') ?? false;
     if (openH != null && openM != null) {
       _openTime = TimeOfDay(hour: openH, minute: openM);
     }
@@ -155,7 +188,10 @@ class BusinessProvider extends ChangeNotifier {
       }
     }
     final plan = prefs.getString('subscription_plan');
-    if (plan != null) _subscriptionPlan = plan;
+    _subscriptionPlan = plan ?? 'free';
+    final exRaw = prefs.getString('subscription_expires_at');
+    _subscriptionExpiresAt =
+        exRaw != null && exRaw.isNotEmpty ? DateTime.tryParse(exRaw) : null;
 
     var qrTok = prefs.getString('store_qr_token');
     if (qrTok == null || qrTok.isEmpty) {
@@ -163,8 +199,29 @@ class BusinessProvider extends ChangeNotifier {
       await prefs.setString('store_qr_token', qrTok);
     }
     _storeQrToken = qrTok;
+    _shopManuallyClosed = prefs.getBool('shop_manually_closed') ?? false;
+    _shopClosedReason = prefs.getString('shop_closed_reason') ?? '';
 
     notifyListeners();
+    debugLogLocalProfile('loadBusiness');
+  }
+
+  /// Debug builds only: prints what is stored locally (SharedPreferences). No API.
+  void debugLogLocalProfile(String reason) {
+    if (!kDebugMode) return;
+    devLog(
+      '[BusinessProfile] $reason\n'
+      '  businessTypeId: ${_selectedBusiness?.id ?? "(none)"}\n'
+      '  name: $_businessName\n'
+      '  address: $_businessAddress\n'
+      '  coverImagePath: ${_businessCoverImagePath.isEmpty ? "(none)" : _businessCoverImagePath}\n'
+      '  mapPin: lat=$_businessLat lng=$_businessLng confirmed=$_businessPinConfirmed\n'
+      '  hours: $formattedHours\n'
+      '  deliveryRadiusKm: ${_deliveryRadiusKm.toStringAsFixed(1)} '
+      '(hasDelivery=$hasDelivery)\n'
+      '  subscription: $_subscriptionPlan (expiry: $_subscriptionExpiresAt)\n'
+      '  charges: base=$_deliveryBaseCharge perKm=$_deliveryPerKmCharge',
+    );
   }
 
   /// Fetch owner businesses from API and store Mongo id matching [selectedBusiness] `type`.
@@ -186,6 +243,15 @@ class BusinessProvider extends ChangeNotifier {
         for (final item in raw) {
           if (item is Map && item['type']?.toString() == typeId) {
             matchId = item['id']?.toString();
+            _shopManuallyClosed = item['shopManuallyClosed'] == true;
+            _shopClosedReason = item['shopClosedReason']?.toString() ?? '';
+            final p = await SharedPreferences.getInstance();
+            await p.setBool('shop_manually_closed', _shopManuallyClosed);
+            if (_shopClosedReason.isEmpty) {
+              await p.remove('shop_closed_reason');
+            } else {
+              await p.setString('shop_closed_reason', _shopClosedReason);
+            }
             break;
           }
         }
@@ -201,6 +267,16 @@ class BusinessProvider extends ChangeNotifier {
         _remoteBusinessMongoId = matchId;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_prefsRemoteMongoId, matchId);
+        await prefs.setString('subscription_plan', _subscriptionPlan);
+        if (_subscriptionExpiresAt != null) {
+          await prefs.setString(
+            'subscription_expires_at',
+            _subscriptionExpiresAt!.toIso8601String(),
+          );
+        } else {
+          await prefs.remove('subscription_expires_at');
+        }
+        await syncSubscriptionFromApi();
         notifyListeners();
       }
     } catch (_) {
@@ -224,8 +300,8 @@ class BusinessProvider extends ChangeNotifier {
           'type': type.id,
           'address':
               _businessAddress.trim().isNotEmpty ? _businessAddress.trim() : 'Karachi',
-          'lat': 24.8607,
-          'lng': 67.0011,
+          'lat': _businessLat,
+          'lng': _businessLng,
         },
       );
       final id = res['id']?.toString();
@@ -250,6 +326,31 @@ class BusinessProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('subscription_plan', plan);
     notifyListeners();
+  }
+
+  /// Server truth for plan + renewal date (`GET /api/subscriptions/status`).
+  Future<void> syncSubscriptionFromApi() async {
+    if (OfflineMode.enabled) return;
+    final id = _remoteBusinessMongoId;
+    if (id == null || id.isEmpty) return;
+    try {
+      final s = await SubscriptionApi.fetchStatus(id);
+      _subscriptionPlan = s.plan;
+      _subscriptionExpiresAt = s.expiresAt;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('subscription_plan', _subscriptionPlan);
+      if (_subscriptionExpiresAt != null) {
+        await prefs.setString(
+          'subscription_expires_at',
+          _subscriptionExpiresAt!.toIso8601String(),
+        );
+      } else {
+        await prefs.remove('subscription_expires_at');
+      }
+      notifyListeners();
+    } catch (_) {
+      // Keep local prefs
+    }
   }
 
   Future<void> updateDeliveryCharges(double base, double perKm) async {
@@ -303,6 +404,29 @@ class BusinessProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateBusinessCoverImagePath(String path) async {
+    _businessCoverImagePath = path.trim();
+    final prefs = await SharedPreferences.getInstance();
+    if (_businessCoverImagePath.isEmpty) {
+      await prefs.remove('business_cover_image_path');
+    } else {
+      await prefs.setString('business_cover_image_path', _businessCoverImagePath);
+    }
+    notifyListeners();
+  }
+
+  /// Persist shop coordinates (map pin). Used when creating the Mongo business doc.
+  Future<void> updateBusinessPin(double lat, double lng) async {
+    _businessLat = lat;
+    _businessLng = lng;
+    _businessPinConfirmed = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('business_lat', lat);
+    await prefs.setDouble('business_lng', lng);
+    await prefs.setBool('business_pin_confirmed', true);
+    notifyListeners();
+  }
+
   Future<void> updateHours(TimeOfDay open, TimeOfDay close) async {
     _openTime = open;
     _closeTime = close;
@@ -324,5 +448,34 @@ class BusinessProvider extends ChangeNotifier {
   void updateThemeColor(Color color) {
     _themeColor = color;
     notifyListeners();
+  }
+
+  /// Shop closed toggle + optional reason (synced to Mongo when [remoteBusinessMongoId] exists).
+  Future<void> setShopManualClose(bool closed, {String? reason}) async {
+    _shopManuallyClosed = closed;
+    _shopClosedReason = (reason ?? '').trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('shop_manually_closed', closed);
+    if (_shopClosedReason.isEmpty) {
+      await prefs.remove('shop_closed_reason');
+    } else {
+      await prefs.setString('shop_closed_reason', _shopClosedReason);
+    }
+    notifyListeners();
+
+    if (OfflineMode.enabled) return;
+    final id = _remoteBusinessMongoId;
+    if (id == null || id.isEmpty) return;
+    try {
+      await ApiClient().patchJson(
+        ApiPaths.businessById(id),
+        body: {
+          'shopManuallyClosed': closed,
+          'shopClosedReason': _shopClosedReason,
+        },
+      );
+    } catch (_) {
+      // Local state still applied; retry on next sync
+    }
   }
 }

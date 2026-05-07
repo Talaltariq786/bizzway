@@ -6,6 +6,10 @@ import { requireRoles } from '../../middlewares/roles.js';
 import { BusinessModel } from '../../models/Business.js';
 import { OrderModel } from '../../models/Order.js';
 import { ProductModel } from '../../models/Product.js';
+import {
+  ORDER_STATUSES_ACTIVE_FOR_RIDER,
+  RIDER_MAX_CONCURRENT_ASSIGNMENTS,
+} from '../../config/order_policy.js';
 import { AssignRiderSchema, CreateOrderSchema, PatchOrderStatusSchema } from './orders.schemas.js';
 
 export function ordersRouter(env: Env) {
@@ -150,6 +154,20 @@ export function ordersRouter(env: Env) {
         if (!business) return res.status(404).json({ error: 'not_found' });
         if (business.ownerId.toString() !== req.auth!.sub && !req.auth!.roles.includes('admin')) {
           return res.status(403).json({ error: 'forbidden' });
+        }
+
+        const alreadyForRider = await OrderModel.countDocuments({
+          assignedRiderId: body.riderUserId,
+          status: { $in: [...ORDER_STATUSES_ACTIVE_FOR_RIDER] },
+          _id: { $ne: order._id },
+        });
+        if (alreadyForRider >= RIDER_MAX_CONCURRENT_ASSIGNMENTS) {
+          return res.status(409).json({
+            error: 'rider_max_active_orders',
+            message:
+              `Is rider ke paas pehle se ${RIDER_MAX_CONCURRENT_ASSIGNMENTS} active orders hain. ` +
+              'Pehle deliver / complete karein, phir naya assign karein.',
+          });
         }
 
         order.assignedRiderId = body.riderUserId as any;

@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/location_api.dart';
+import '../../core/config/offline_mode.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/geo.dart';
 import '../../models/job_request.dart';
+import '../../models/service_provider_profile_mapper.dart';
 import '../../providers/job_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/service_provider_directory_provider.dart';
 import '../../models/service_provider_profile.dart';
+import 'dart:io' show File;
+import 'package:url_launcher/url_launcher.dart';
 
 // ── Emergency quick-dial entries ──────────────────────────────────────────────
 
@@ -39,16 +45,75 @@ class NearMeScreen extends StatefulWidget {
 class _NearMeScreenState extends State<NearMeScreen> {
   static const double _radiusKm = 5.0;
 
+  List<ServiceProviderProfile>? _apiProviders;
+  double? _lastFetchedLat;
+  double? _lastFetchedLng;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeRefreshApiProviders());
+  }
+
+  Future<void> _maybeRefreshApiProviders() async {
+    if (OfflineMode.enabled || !mounted) return;
+    final loc = context.read<LocationProvider>();
+    final lat = loc.selectedAddress.lat;
+    final lng = loc.selectedAddress.lng;
+    if (lat == null || lng == null) return;
+    if (lat == _lastFetchedLat && lng == _lastFetchedLng && _apiProviders != null) {
+      return;
+    }
+    try {
+      final api = LocationApi(ApiClient());
+      final raw = await api.searchServiceProviders(
+        nearLat: lat,
+        nearLng: lng,
+        radiusKm: _radiusKm,
+      );
+      if (!mounted) return;
+      final mapped =
+          raw.map(ServiceProviderProfileMapper.fromSearchApi).toList(growable: false);
+      setState(() {
+        _apiProviders = mapped;
+        _lastFetchedLat = lat;
+        _lastFetchedLng = lng;
+      });
+    } catch (_) {}
+  }
+
+  String _dedupeKey(ServiceProviderProfile p) {
+    final ph = p.phone.trim();
+    if (ph.isNotEmpty && ph != '—') return ph;
+    return p.id.trim().isNotEmpty ? p.id : p.hashCode.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocationProvider>();
     final addr = loc.selectedAddress;
     final directory = context.watch<ServiceProviderDirectoryProvider>();
 
+    final lat = addr.lat;
+    final lng = addr.lng;
+    if (!OfflineMode.enabled &&
+        lat != null &&
+        lng != null &&
+        (lat != _lastFetchedLat || lng != _lastFetchedLng)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeRefreshApiProviders());
+    }
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _lastFetchedLat = null;
+          _lastFetchedLng = null;
+          await _maybeRefreshApiProviders();
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // ── Header ─────────────────────────────────────────────────────
           SliverToBoxAdapter(child: _buildHeader(addr)),
           SliverToBoxAdapter(
@@ -63,6 +128,7 @@ class _NearMeScreenState extends State<NearMeScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -122,7 +188,18 @@ class _NearMeScreenState extends State<NearMeScreen> {
     final userLat = loc.selectedAddress.lat;
     final userLng = loc.selectedAddress.lng;
 
-    final list = directory.providers.where((p) {
+    final merged = <String, ServiceProviderProfile>{};
+    for (final p in directory.providers) {
+      merged[_dedupeKey(p)] = p;
+    }
+    final apiSlice = _apiProviders;
+    if (apiSlice != null) {
+      for (final p in apiSlice) {
+        merged[_dedupeKey(p)] = p;
+      }
+    }
+
+    final list = merged.values.where((p) {
       if (!p.isOnline) return false;
       if (userLat == null || userLng == null) return true; // fallback (no coords)
       if (p.lat == null || p.lng == null) return false;
@@ -201,7 +278,10 @@ class _NearMeScreenState extends State<NearMeScreen> {
                 borderRadius: BorderRadius.circular(18),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => _ServiceProviderDetailScreen(profile: p),
+                    builder: (_) => _ServiceProviderDetailScreen(
+                      profile: p,
+                      distanceKmFromUser: dist,
+                    ),
                   ),
                 ),
                 child: Row(
@@ -267,6 +347,40 @@ class _NearMeScreenState extends State<NearMeScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (p.scrapRatesDisplay.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'PKR rates on profile · plastic, paper, iron…',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary.withValues(alpha: 0.95),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.call_rounded,
+                                size: 12,
+                                color: AppColors.textHint,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  p.phone.trim().isEmpty ? '—' : p.phone.trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 6),
                           Row(
                             children: [
@@ -279,7 +393,7 @@ class _NearMeScreenState extends State<NearMeScreen> {
                               Text(
                                 dist == null
                                     ? '—'
-                                    : '${dist.toStringAsFixed(1)} km',
+                                    : '${dist.toStringAsFixed(1)} km away',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: AppColors.textSecondary,
@@ -310,7 +424,14 @@ class _NearMeScreenState extends State<NearMeScreen> {
                             children: [
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => _dial(p.name, p.phone),
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => _ServiceProviderDetailScreen(
+                                        profile: p,
+                                        distanceKmFromUser: dist,
+                                      ),
+                                    ),
+                                  ),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 8,
@@ -323,11 +444,11 @@ class _NearMeScreenState extends State<NearMeScreen> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.call_rounded,
+                                        Icon(Icons.person_rounded,
                                             color: Colors.white, size: 14),
                                         SizedBox(width: 6),
                                         Text(
-                                          'Call',
+                                          'Details',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 12,
@@ -710,30 +831,25 @@ class _NearMeScreenState extends State<NearMeScreen> {
   }
 
   void _dial(String name, String phone) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: [
-          const Icon(Icons.call_rounded, color: Colors.white, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text('Calling $name — $phone',
-                  style: const TextStyle(fontWeight: FontWeight.w600))),
-        ]),
-        backgroundColor: const Color(0xFF1A3A5C),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    final raw = phone.trim();
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+    final uri = Uri(scheme: 'tel', path: digits);
+    launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
 
 class _ServiceProviderDetailScreen extends StatelessWidget {
   final ServiceProviderProfile profile;
-  const _ServiceProviderDetailScreen({required this.profile});
+  final double? distanceKmFromUser;
+  const _ServiceProviderDetailScreen({
+    required this.profile,
+    this.distanceKmFromUser,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final expYears = _experienceYears(profile.createdAt);
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
@@ -757,7 +873,8 @@ class _ServiceProviderDetailScreen extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: Icon(profile.icon, color: Colors.white, size: 30),
+                  clipBehavior: Clip.antiAlias,
+                  child: _providerAvatar(profile),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -783,6 +900,17 @@ class _ServiceProviderDetailScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (expYears != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Experience: $expYears year${expYears == 1 ? '' : 's'}',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.84),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
                         profile.phone,
@@ -817,23 +945,104 @@ class _ServiceProviderDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 _row('Area', profile.areaLabel),
-                _row('Plan', profile.plan ?? '—'),
-                _row('CNIC', (profile.nic ?? '').isEmpty ? '—' : profile.nic!),
+                if (distanceKmFromUser != null)
+                  _row('Distance', '${distanceKmFromUser!.toStringAsFixed(1)} km'),
+                if (expYears != null)
+                  _row(
+                    'Experience',
+                    '$expYears year${expYears == 1 ? '' : 's'}',
+                  ),
               ],
             ),
           ),
+          if (profile.scrapRatesDisplay.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.payments_outlined,
+                          size: 18, color: Colors.green.shade700),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Scrap / kabar rates (PKR)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Indicative rates — quality & daily market move kar sakti hai. '
+                    'Final weight pe call par confirm karein.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: AppColors.textSecondary.withValues(alpha: 0.95),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...profile.scrapRatesDisplay.entries.map(
+                    (e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: Text(
+                              e.key,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 4,
+                            child: Text(
+                              e.value,
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Calling ${profile.name} — ${profile.phone}'),
-                        backgroundColor: AppColors.primary,
-                      ),
-                    );
+                    final raw = profile.phone.trim();
+                    final digits = raw.replaceAll(RegExp(r'\D'), '');
+                    if (digits.isEmpty) return;
+                    final uri = Uri(scheme: 'tel', path: digits);
+                    launchUrl(uri, mode: LaunchMode.externalApplication);
                   },
                   icon: const Icon(Icons.call_rounded),
                   label: const Text('Call'),
@@ -851,6 +1060,38 @@ class _ServiceProviderDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  static int? _experienceYears(DateTime createdAt) {
+    // If we don't have a real "experience" field yet, we approximate using profile age.
+    final now = DateTime.now();
+    final days = now.difference(createdAt).inDays;
+    if (days < 30) return null; // too new → hide rather than show 0 years
+    final years = (days / 365).floor();
+    return years < 1 ? 1 : years;
+  }
+
+  static Widget _providerAvatar(ServiceProviderProfile p) {
+    final path = (p.imagePath ?? '').trim();
+    if (path.isEmpty) {
+      return Center(child: Icon(p.icon, color: Colors.white, size: 30));
+    }
+    final isUrl = path.startsWith('http://') || path.startsWith('https://');
+    if (isUrl) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            Center(child: Icon(p.icon, color: Colors.white, size: 30)),
+      );
+    }
+    // Local file path (best-effort). If file doesn't exist on this device, fallback.
+    return Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          Center(child: Icon(p.icon, color: Colors.white, size: 30)),
     );
   }
 

@@ -56,8 +56,8 @@ class BookSlotViewModel extends ChangeNotifier {
     '06:00 PM',
   ];
 
-  // TODO: Replace with real availability from backend/provider.
-  final List<String> bookedSlots = const ['10:00 AM', '02:00 PM', '04:30 PM'];
+  /// Busy slots (UI only). When backend exposes per-day availability, load here.
+  final List<String> bookedSlots = const [];
 
   List<DateTime> get nextSevenDays =>
       List.generate(7, (i) => DateTime.now().add(Duration(days: i)));

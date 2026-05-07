@@ -23,6 +23,15 @@ const BusinessSchema = new Schema(
     type: { type: String, index: true }, // grocery/restaurant/etc
     address: { type: String },
     location: { type: PointSchema, required: true },
+    /** 'free' | 'starter' | 'pro' | 'business' — see subscription_plans config */
+    subscriptionPlan: { type: String, default: 'free', index: true },
+    subscriptionExpiresAt: { type: Date },
+    subscriptionLastProvider: { type: String },
+    subscriptionLastPaymentIntentId: { type: Schema.Types.ObjectId, ref: 'PaymentIntent' },
+    /** Owner override: shop closed even if "hours" would say open. */
+    shopManuallyClosed: { type: Boolean, default: false, index: true },
+    /** Short note for staff / optional customer message (e.g. "Mood off", "Stock taking"). */
+    shopClosedReason: { type: String, maxlength: 500 },
   },
   { timestamps: true },
 );

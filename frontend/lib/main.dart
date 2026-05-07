@@ -11,6 +11,7 @@ import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platf
 
 import 'app.dart';
 import 'core/config/api_config.dart';
+import 'core/demo/presenter_mode.dart';
 import 'firebase_options.dart';
 
 /// Reduces native map crashes on some Android devices (OEM / GPU quirks).
@@ -27,6 +28,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _configureGoogleMapsAndroid();
   await ApiConfig.initFromPrefs();
+  await PresenterMode.initFromPrefs();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

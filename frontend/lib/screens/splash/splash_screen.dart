@@ -48,18 +48,18 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _logoController.forward().then((_) => _textController.forward());
-    
-    // Check auth status after animation
+
+    // Auth check: short branding delay only (pehle 2.5s tha — logged-in user ko bore karta tha)
     _checkAuthAndNavigate();
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    await Future.delayed(const Duration(milliseconds: 2500));
-    
+    await Future.delayed(const Duration(milliseconds: 900));
+
     if (!mounted) return;
-    
+
     final auth = context.read<AuthProvider>();
-    
+
     // Check if user is already logged in
     await auth.checkAuthStatus();
     
@@ -86,10 +86,11 @@ class _SplashScreenState extends State<SplashScreen>
           Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
         }
       }
-    } else {
-      // Not logged in - go to login
-      Navigator.pushReplacementNamed(context, AppRoutes.login);
+      return;
     }
+
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
   @override
@@ -97,10 +98,6 @@ class _SplashScreenState extends State<SplashScreen>
     _logoController.dispose();
     _textController.dispose();
     super.dispose();
-  }
-
-  void _onGetStarted() {
-    Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
   @override
@@ -187,24 +184,16 @@ class _SplashScreenState extends State<SplashScreen>
                   opacity: _textOpacity,
                   child: Column(
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _onGetStarted,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            AppStrings.getStarted,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                        height: 52,
+                        child: Center(
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
                             ),
                           ),
                         ),

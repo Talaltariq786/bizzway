@@ -42,7 +42,7 @@ Future<OwnedRider?> showAssignRiderSheet(
               ),
               const SizedBox(height: 12),
               const Text(
-                'Rider assign karein',
+                'Assign rider',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 17,
@@ -51,7 +51,8 @@ Future<OwnedRider?> showAssignRiderSheet(
               ),
               const SizedBox(height: 4),
               Text(
-                'Pehle Profile → Meray riders se apni team add karein. ID wahi hai jo aap ne banayi.',
+                'Profile → Team riders se IDs banayein. Ek rider par ek waqt mein max '
+                '${OrderProvider.maxConcurrentAssignmentsPerRider} active deliveries.',
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.35,
@@ -71,7 +72,7 @@ Future<OwnedRider?> showAssignRiderSheet(
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Koi rider add nahi',
+                        'No riders added yet',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary,
@@ -88,7 +89,7 @@ Future<OwnedRider?> showAssignRiderSheet(
                           });
                         },
                         icon: const Icon(Icons.add_rounded),
-                        label: const Text('Rider add karein'),
+                        label: const Text('Add riders'),
                       ),
                     ],
                   ),
@@ -151,13 +152,26 @@ Future<void> assignRiderToOrder(BuildContext context, String orderId) async {
   final bizId = context.read<BusinessProvider>().selectedBusiness?.id ?? '';
   final rider = await showAssignRiderSheet(context, businessId: bizId);
   if (rider == null || !context.mounted) return;
-  context.read<OrderProvider>().assignRider(
+  final ok = context.read<OrderProvider>().assignRider(
         orderId,
         riderId: rider.riderId,
         riderName: rider.name,
         riderPhone: rider.phone,
       );
   if (!context.mounted) return;
+  if (!ok) {
+    final max = OrderProvider.maxConcurrentAssignmentsPerRider;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${rider.name} ke paas pehle se $max active orders hain. '
+          'Pehle complete karein, phir naya assign karein.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return;
+  }
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text('Rider assign: ${rider.name} (${rider.riderId})'),

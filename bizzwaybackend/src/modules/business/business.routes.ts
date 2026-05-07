@@ -6,7 +6,12 @@ import { requireRoles } from '../../middlewares/roles.js';
 import { BusinessModel } from '../../models/Business.js';
 import { ProductModel } from '../../models/Product.js';
 import { kmToMeters, parseNearParam } from '../../utils/geo.js';
-import { CreateBusinessSchema, CreateProductSchema, PatchProductSchema } from './business.schemas.js';
+import {
+  CreateBusinessSchema,
+  CreateProductSchema,
+  PatchBusinessSchema,
+  PatchProductSchema,
+} from './business.schemas.js';
 
 export function businessRouter(env: Env) {
   const r = Router();
@@ -57,6 +62,8 @@ export function businessRouter(env: Env) {
         type: b.type,
         address: b.address,
         location: b.location,
+        shopManuallyClosed: b.shopManuallyClosed ?? false,
+        shopClosedReason: b.shopClosedReason ?? null,
       })),
     );
   });
@@ -77,8 +84,48 @@ export function businessRouter(env: Env) {
           type: b.type,
           address: b.address,
           location: b.location,
+          subscriptionPlan: b.subscriptionPlan ?? 'free',
+          subscriptionExpiresAt: b.subscriptionExpiresAt ?? null,
+          shopManuallyClosed: b.shopManuallyClosed ?? false,
+          shopClosedReason: b.shopClosedReason ?? null,
         })),
       });
+    },
+  );
+
+  r.patch(
+    '/:id',
+    requireAuth(env),
+    requireRoles('businessOwner', 'admin'),
+    async (req, res, next) => {
+      try {
+        const id = req.params.id;
+        const b = await BusinessModel.findById(id);
+        if (!b) return res.status(404).json({ error: 'not_found' });
+        if (b.ownerId.toString() !== req.auth!.sub && !req.auth!.roles.includes('admin')) {
+          return res.status(403).json({ error: 'forbidden' });
+        }
+        const patch = PatchBusinessSchema.parse(req.body);
+        const $set: Record<string, unknown> = {};
+        if (patch.shopManuallyClosed !== undefined) {
+          $set.shopManuallyClosed = patch.shopManuallyClosed;
+        }
+        if (patch.shopClosedReason !== undefined) {
+          const t = (patch.shopClosedReason ?? '').trim();
+          $set.shopClosedReason = t.length > 0 ? t : null;
+        }
+        if (Object.keys($set).length > 0) {
+          await BusinessModel.updateOne({ _id: b._id }, { $set });
+        }
+        const doc = await BusinessModel.findById(id);
+        return res.json({
+          id: doc!._id.toString(),
+          shopManuallyClosed: doc!.shopManuallyClosed ?? false,
+          shopClosedReason: doc!.shopClosedReason ?? null,
+        });
+      } catch (e) {
+        return next(e);
+      }
     },
   );
 
@@ -92,6 +139,8 @@ export function businessRouter(env: Env) {
       address: b.address,
       location: b.location,
       ownerId: b.ownerId?.toString?.() ?? b.ownerId,
+      shopManuallyClosed: b.shopManuallyClosed ?? false,
+      shopClosedReason: b.shopClosedReason ?? null,
     });
   });
 

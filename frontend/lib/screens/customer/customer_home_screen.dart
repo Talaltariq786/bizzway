@@ -1809,6 +1809,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                                 color: Colors.white.withValues(alpha: 0.7),
                                 fontSize: 10)),
                       ]),
+                      if (!biz.isOpen &&
+                          (biz.shopClosedReason ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          biz.shopClosedReason!,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 9,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -1956,6 +1970,19 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         fontWeight: FontWeight.w600),
                   ),
                 ]),
+                if (!biz.isOpen && (biz.shopClosedReason ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    biz.shopClosedReason!,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textHint,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 if (biz.tagline != null) ...[
                   const SizedBox(height: 4),
                   Text(biz.tagline!,

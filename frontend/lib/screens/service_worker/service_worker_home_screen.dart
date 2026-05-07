@@ -9,6 +9,7 @@ import '../../models/job_request.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../widgets/common/sliding_drawer_shell.dart';
+import '../auth/login/login_constants.dart';
 import 'job_request_detail_screen.dart';
 
 class ServiceWorkerHomeScreen extends StatefulWidget {
@@ -24,6 +25,15 @@ class _ServiceWorkerHomeScreenState extends State<ServiceWorkerHomeScreen> {
       GlobalKey<SlidingDrawerShellState>();
 
   static const _titles = ['Jobs', 'History', 'Profile'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<JobProvider>().seedDemoJobsIfEmpty();
+    });
+  }
 
   void _selectTab(int index) {
     setState(() => _tab = index);
@@ -61,6 +71,11 @@ class _ServiceWorkerHomeScreenState extends State<ServiceWorkerHomeScreen> {
         onSelectTab: _selectTab,
         onClose: () => _drawerKey.currentState?.closeDrawer(),
         onLogout: () => _signOut(auth),
+        showKabari: professionIsKabariScrap(auth.serviceProfession),
+        onOpenScrapRates: () {
+          _drawerKey.currentState?.closeDrawer();
+          Navigator.pushNamed(context, AppRoutes.scrapRatesEditor);
+        },
       ),
       child: Scaffold(
         backgroundColor: AppColors.backgroundLight,
@@ -104,7 +119,6 @@ class _ServiceWorkerHomeScreenState extends State<ServiceWorkerHomeScreen> {
               pendingCount: pendingJobs.length,
               activeCount: activeJobs.length,
               completedCount: completedJobs.length,
-              onLogout: () => _signOut(auth),
             ),
           ],
         ),
@@ -136,6 +150,8 @@ class _ServiceWorkerHomeScreenState extends State<ServiceWorkerHomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        _demoInfoBanner(),
+        const SizedBox(height: 12),
         _onlineToggleCard(context, auth),
         const SizedBox(height: 12),
         if ((auth.serviceProfession ?? '').trim().isEmpty)
@@ -512,13 +528,42 @@ class _ServiceWorkerHomeScreenState extends State<ServiceWorkerHomeScreen> {
     );
   }
 
+  Widget _demoInfoBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 18, color: AppColors.primary),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Neeche sample jobs hain — address, kaam ki detail aur map par location '
+              'dekhne ka flow try karein. Profession set karne se filter match hota hai.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.35,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProfileTab({
     required BuildContext context,
     required AuthProvider auth,
     required int pendingCount,
     required int activeCount,
     required int completedCount,
-    required VoidCallback onLogout,
   }) {
     final title = (auth.serviceProfession ?? '').trim().isEmpty
         ? 'Service Worker'
@@ -622,23 +667,26 @@ class _ServiceWorkerHomeScreenState extends State<ServiceWorkerHomeScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: onLogout,
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Sign out'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.error,
-              side: const BorderSide(color: AppColors.error),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+        if (professionIsKabariScrap(auth.serviceProfession)) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  Navigator.pushNamed(context, AppRoutes.scrapRatesEditor),
+              icon: const Icon(Icons.currency_exchange_rounded),
+              label: const Text('Scrap / kabar rates (PKR) — customer ko dikhe ga'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -723,7 +771,8 @@ class _ServiceWorkerHomeScreenState extends State<ServiceWorkerHomeScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Select Profession'),
           content: DropdownButtonFormField<String>(
-            value: selected,
+            key: ValueKey<String>(selected),
+            initialValue: selected,
             items: options
                 .map((o) => DropdownMenuItem<String>(value: o, child: Text(o)))
                 .toList(),
@@ -923,6 +972,8 @@ class _ServiceWorkerSideDrawer extends StatelessWidget {
     required this.onSelectTab,
     required this.onClose,
     required this.onLogout,
+    this.showKabari = false,
+    this.onOpenScrapRates,
   });
 
   final int selectedIndex;
@@ -933,6 +984,8 @@ class _ServiceWorkerSideDrawer extends StatelessWidget {
   final void Function(int) onSelectTab;
   final VoidCallback onClose;
   final VoidCallback onLogout;
+  final bool showKabari;
+  final VoidCallback? onOpenScrapRates;
 
   @override
   Widget build(BuildContext context) {
@@ -1052,12 +1105,20 @@ class _ServiceWorkerSideDrawer extends StatelessWidget {
                   subtitle: 'Online status & account',
                   onTap: () => onSelectTab(2),
                 ),
+                if (showKabari && onOpenScrapRates != null)
+                  _drawerItem(
+                    selected: false,
+                    icon: Icons.recycling_rounded,
+                    title: 'Scrap rates (PKR)',
+                    subtitle: 'Paper, plastic, iron — Near Me profile',
+                    onTap: onOpenScrapRates!,
+                  ),
                 const Padding(
                   padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
                   child: Divider(),
                 ),
                 ListTile(
-                  leading: Icon(
+                  leading: const Icon(
                     Icons.logout_rounded,
                     color: AppColors.error,
                   ),

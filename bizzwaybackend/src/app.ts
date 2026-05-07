@@ -18,6 +18,7 @@ import { ridersRouter } from './modules/riders/riders.routes.js';
 import { serviceProvidersRouter } from './modules/service-providers/service_providers.routes.js';
 import { uploadsRouter } from './modules/uploads/uploads.routes.js';
 import { pushRouter } from './modules/push/push.routes.js';
+import { subscriptionsRouter } from './modules/subscriptions/subscriptions.routes.js';
 
 export function createApp(opts: { corsOrigin?: string; env: Env }) {
   const app = express();
@@ -80,6 +81,7 @@ export function createApp(opts: { corsOrigin?: string; env: Env }) {
   app.use('/api', serviceProvidersRouter(opts.env));
   app.use('/api', uploadsRouter(opts.env));
   app.use('/api', pushRouter(opts.env));
+  app.use('/api', subscriptionsRouter(opts.env));
 
   app.use(errorHandler);
   return app;

@@ -20,8 +20,28 @@ import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/custom_text_field.dart';
 import 'product_image_library_screen.dart';
 
+/// Investor / screen-recording scenarios for [AddProductScreen].
+enum InvestorDemoAddProductScenario {
+  /// Grocery bundle + Ramadan-style flags (current default demo).
+  groceryBundle,
+  /// Restaurant combo meal with multiple lines.
+  restaurantCombo,
+  /// Rent-a-car fleet line (daily self-drive).
+  rentacarVehicle,
+}
+
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  const AddProductScreen({
+    super.key,
+    this.investorDemoPrefill = false,
+    this.investorDemoScenario,
+  });
+
+  /// Guided tour: auto-fill Ramadan bundle + discount + price for recording.
+  final bool investorDemoPrefill;
+
+  /// When set, fills fields for that vertical (overrides [investorDemoPrefill]).
+  final InvestorDemoAddProductScenario? investorDemoScenario;
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -160,6 +180,106 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final v = result.trim();
     if (v.isEmpty) return;
     setState(() => _selectedUnit = v);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.investorDemoScenario != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _investorDemoPrefillScenario(widget.investorDemoScenario!),
+      );
+    } else if (widget.investorDemoPrefill) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _investorDemoPrefill());
+    }
+  }
+
+  Future<void> _investorDemoPrefillScenario(
+    InvestorDemoAddProductScenario scenario,
+  ) async {
+    if (!mounted) return;
+    await Future<void>.delayed(const Duration(milliseconds: 520));
+    if (!mounted) return;
+    final biz = context.read<BusinessProvider>();
+    final raw = biz.selectedBusiness?.id ?? '';
+    final bizId = raw.isEmpty ? 'grocery' : raw;
+
+    switch (scenario) {
+      case InvestorDemoAddProductScenario.groceryBundle:
+        _applyInvestorDemoGroceryBundle(bizId);
+        break;
+      case InvestorDemoAddProductScenario.restaurantCombo:
+        setState(() {
+          _nameCtrl.text = 'Family Burger Combo';
+          _descCtrl.text =
+              'Two signature burgers + jumbo fries + 1.5 L drink — share meal.';
+          _priceCtrl.text = '1899';
+          _selectedCategory = 'Combos';
+          _hasDiscount = true;
+          _discountCtrl.text = '10';
+          _isRamzanSpecial = false;
+          _isValentinesSpecial = false;
+          _isBundle = true;
+          _bundleItems
+            ..clear()
+            ..addAll([
+              'Classic beef burger',
+              'Classic beef burger',
+              'Jumbo fries',
+              'Soft drink 1.5 L',
+            ]);
+          _selectedUnit = 'per combo';
+        });
+        break;
+      case InvestorDemoAddProductScenario.rentacarVehicle:
+        setState(() {
+          _nameCtrl.text = 'Toyota Fortuner — self-drive';
+          _descCtrl.text =
+              '2023 • AC • Bluetooth • security deposit at pickup.';
+          _priceCtrl.text = '13500';
+          _selectedCategory = 'SUV';
+          _hasDiscount = false;
+          _discountCtrl.clear();
+          _isBundle = false;
+          _bundleItems.clear();
+          _isRamzanSpecial = false;
+          _isValentinesSpecial = false;
+          _selectedUnit = 'per day';
+        });
+        break;
+    }
+  }
+
+  void _applyInvestorDemoGroceryBundle(String bizId) {
+    setState(() {
+      _nameCtrl.text = 'Ramadan Family Pack';
+      _descCtrl.text =
+          'Limited bundle: dates, juice & staples — Ramadan special.';
+      _priceCtrl.text = '3499';
+      _selectedCategory = GroceryCategories.aisleNames[3];
+      _hasDiscount = true;
+      _discountCtrl.text = '15';
+      _isRamzanSpecial = _showRamzanToggle(bizId);
+      _isBundle = true;
+      _bundleItems
+        ..clear()
+        ..addAll([
+          'Premium dates 500g',
+          'Rooh Afza 750ml',
+          'Chana daal 1kg',
+        ]);
+      _selectedUnit = 'per pack';
+    });
+  }
+
+  Future<void> _investorDemoPrefill() async {
+    if (!mounted || !widget.investorDemoPrefill) return;
+    await Future<void>.delayed(const Duration(milliseconds: 520));
+    if (!mounted) return;
+    final biz = context.read<BusinessProvider>();
+    final raw = biz.selectedBusiness?.id ?? '';
+    final bizId = raw.isEmpty ? 'grocery' : raw;
+    _applyInvestorDemoGroceryBundle(bizId);
   }
 
   @override
@@ -324,69 +444,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  String _fallbackCategoryForDelete(String bizId, String deleting, List<String> categories) {
-    final trimmed = deleting.trim();
-    final list = categories.where((c) => c.trim().isNotEmpty && c != trimmed).toList();
-    if (list.contains('General')) return 'General';
-    if (list.isNotEmpty) return list.first;
-    // last resort
-    return 'General';
-  }
-
-  Future<void> _confirmDeleteCategory(
-    BuildContext context, {
-    required String bizId,
-    required String category,
-    required List<String> categories,
-  }) async {
-    final biz = context.read<BusinessProvider>();
-    final productProv = context.read<ProductProvider>();
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete category?'),
-        content: Text(
-          'Delete "$category"? Products in this category will be moved to a safe category.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-
-    final fallback = _fallbackCategoryForDelete(bizId, category, categories);
-    productProv.migrateCategoryForBusiness(
-      bizId,
-      fromCategory: category,
-      toCategory: fallback,
-    );
-    await biz.removeCustomCategory(category);
-
-    if (!mounted) return;
-    if (_selectedCategory == category) {
-      setState(() => _selectedCategory = fallback);
-    } else {
-      setState(() {});
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Category deleted. Moved items to "$fallback".'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-  }
-
   bool _isServiceBiz(String id) =>
       ['salon', 'gym', 'clinic', 'beauty', 'mechanic', 'petcare']
           .contains(id);
@@ -488,11 +545,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ElevatedButton(
             onPressed: () async {
               await biz.addCustomCategory(ctrl.text);
-              if (!mounted) return;
+              if (!context.mounted) return;
               setState(() {
                 final name = ctrl.text.trim();
                 if (name.isNotEmpty) _selectedCategory = name;
               });
+              if (!ctx.mounted) return;
               Navigator.pop(ctx);
             },
             child: const Text('Save'),
@@ -508,7 +566,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final productProv = context.watch<ProductProvider>();
     final bizId = biz.selectedBusiness?.id ?? '';
     final categories = biz.categories;
-    final customCategories = biz.customCategories.toSet();
     final isService = _isServiceBiz(bizId);
     final isFood = _isFoodBiz(bizId);
     final isShop = _isShopBiz(bizId);
@@ -881,22 +938,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── Description ──────────────────────────────────────────
-              CustomTextField(
-                label: 'Description',
-                hint: isService
-                    ? 'What does this service include?'
-                    : isFood
-                        ? 'Ingredients or short description...'
-                        : 'Brief product description...',
-                controller: _descCtrl,
-                maxLines: 3,
-                prefixIcon: Icons.description_outlined,
-                validator: (v) =>
-                    v!.isEmpty ? 'Please enter description' : null,
-              ),
-              const SizedBox(height: 16),
-
               // ── Price ─────────────────────────────────────────────────
               CustomTextField(
                 label: 'Price (Rs.)',
@@ -912,520 +953,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── Package / Combo builder ───────────────────────────────
-              if (showBundle) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.all_inclusive_rounded,
-                              color: bizColor, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              isFood ? 'Combo' : 'Package',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          Switch(
-                            value: _isBundle,
-                            activeColor: bizColor,
-                            onChanged: (v) => setState(() {
-                              _isBundle = v;
-                              if (!v) _bundleItems.clear();
-                            }),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        isFood
-                            ? 'Enable to create a combo that includes multiple items.'
-                            : 'Enable to bundle multiple items in one package.',
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                      if (_isBundle) ...[
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ..._bundleItems.map((t) => Chip(
-                                  label: Text(t),
-                                  onDeleted: () =>
-                                      setState(() => _bundleItems.remove(t)),
-                                )),
-                            ActionChip(
-                              label: Text(isFood
-                                  ? '+ Add combo items'
-                                  : '+ Add package items'),
-                              avatar: const Icon(Icons.add_rounded, size: 18),
-                              onPressed: () => _pickBundleItems(
-                                context,
-                                existing: existing,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Included items: ${_bundleItems.length}',
-                          style: const TextStyle(
-                              fontSize: 12, color: AppColors.textHint),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Ramzan Special / Valentine's Special Toggle ────────────────────────
-              if (_showRamzanToggle(bizId) && !_isFlowerShop(bizId))
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.celebration_rounded, color: bizColor, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Ramzan Special',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Mark this as Ramzan offer',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: _isRamzanSpecial,
-                        activeColor: bizColor,
-                        onChanged: (v) => setState(() => _isRamzanSpecial = v),
-                      ),
-                    ],
-                  ),
-                ),
-              if (_isFlowerShop(bizId))
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.favorite_rounded, color: Colors.red, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Valentine's Special",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              "Mark this as Valentine's Day offer",
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: _isValentinesSpecial,
-                        activeColor: Colors.red,
-                        onChanged: (v) => setState(() => _isValentinesSpecial = v),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 16),
-
-              // ── Gym: Package duration + Trainer toggle ────────────────
-              if (isGym) ...[
-                if (isGymMembership ||
-                    _selectedCategory == 'Group Classes' ||
-                    _selectedCategory == 'Diet Plans') ...[
-                  const Text('Package Duration',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary)),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _gymDurations.map((d) {
-                      final sel = _gymPackageDuration == d;
-                      return GestureDetector(
-                        onTap: () =>
-                            setState(() => _gymPackageDuration = d),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: sel
-                                ? bizColor
-                                : bizColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(d,
-                              style: TextStyle(
-                                  color: sel ? Colors.white : bizColor,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13)),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                // Trainer toggle — only for Memberships
-                if (isGymMembership) ...[
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: bizColor.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                          color: bizColor.withValues(alpha: 0.25)),
-                    ),
-                    child: Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: _gymWithTrainer
-                              ? bizColor
-                              : Colors.grey.shade200,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.sports_gymnastics_rounded,
-                            color: _gymWithTrainer
-                                ? Colors.white
-                                : Colors.grey,
-                            size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Includes Personal Trainer',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: AppColors.textPrimary)),
-                            Text(
-                                _gymWithTrainer
-                                    ? 'Dedicated trainer assigned'
-                                    : 'Self-workout only',
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary)),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: _gymWithTrainer,
-                        onChanged: (v) =>
-                            setState(() => _gymWithTrainer = v),
-                        activeThumbColor: bizColor,
-                      ),
-                    ]),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                // Discount for all gym types
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const Icon(Icons.local_offer_rounded,
-                            color: Colors.orange, size: 20),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text('Add Discount',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: AppColors.textPrimary)),
-                        ),
-                        Switch(
-                          value: _hasDiscount,
-                          onChanged: (v) =>
-                              setState(() => _hasDiscount = v),
-                          activeThumbColor: Colors.orange,
-                        ),
-                      ]),
-                      if (_hasDiscount) ...[
-                        const SizedBox(height: 12),
-                        CustomTextField(
-                          label: 'Discount %',
-                          hint: 'e.g. 15',
-                          controller: _discountCtrl,
-                          keyboardType: TextInputType.number,
-                          prefixIcon: Icons.percent_rounded,
-                        ),
-                        const SizedBox(height: 8),
-                        if (_priceCtrl.text.isNotEmpty &&
-                            _discountCtrl.text.isNotEmpty) ...[
-                          Builder(builder: (_) {
-                            final p =
-                                double.tryParse(_priceCtrl.text) ?? 0;
-                            final d =
-                                double.tryParse(_discountCtrl.text) ?? 0;
-                            final discounted = p * (1 - d / 100);
-                            return Text(
-                              'Customer pays: Rs. ${discounted.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.bold),
-                            );
-                          }),
-                        ],
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Shop: Unit ───────────────────────────────────────────
-              if (isShop) ...[
-                const Text('Unit / Pricing',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ...(_isFlowerShop(bizId) ? _flowerUnits : _units).map((u) {
-                      final selected = _selectedUnit == u;
-                      return GestureDetector(
-                        onTap: () => setState(() => _selectedUnit = u),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color:
-                                selected ? bizColor : bizColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(u,
-                              style: TextStyle(
-                                  color: selected ? Colors.white : bizColor,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12)),
-                        ),
-                      );
-                    }),
-                    ActionChip(
-                      label: const Text('Custom unit'),
-                      avatar: const Icon(Icons.edit_rounded, size: 18),
-                      onPressed: () => _setCustomUnit(context, bizColor),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Selected: $_selectedUnit',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textHint),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Pharmacy: discount slabs (min bill → %) ──────────────
-              if (isPharmacy) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                        color: Colors.teal.withValues(alpha: 0.35)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.savings_outlined,
-                              color: bizColor, size: 20),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'Discount slab',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: AppColors.textPrimary),
-                            ),
-                          ),
-                          Switch(
-                            value: _hasDiscount,
-                            onChanged: (v) => setState(() => _hasDiscount = v),
-                            activeThumbColor: bizColor,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Example: bill ≥ Rs. 5,000 → 5% off. Add one row per slab.',
-                        style: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                      if (_hasDiscount) ...[
-                        const SizedBox(height: 12),
-                        CustomTextField(
-                          label: 'Minimum bill (Rs.)',
-                          hint: 'e.g. 5000',
-                          controller: _minOrderCtrl,
-                          keyboardType: TextInputType.number,
-                          prefixIcon: Icons.shopping_cart_outlined,
-                        ),
-                        const SizedBox(height: 12),
-                        CustomTextField(
-                          label: 'Discount %',
-                          hint: 'e.g. 5',
-                          controller: _discountCtrl,
-                          keyboardType: TextInputType.number,
-                          prefixIcon: Icons.percent_rounded,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Discount / Deal (non-gym, non-clinic, non-pharmacy) ─
-              if (showStandardDiscount) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.local_offer_rounded,
-                              color: Colors.orange, size: 20),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text('Add Discount / Deal',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: AppColors.textPrimary)),
-                          ),
-                          Switch(
-                            value: _hasDiscount,
-                            onChanged: (v) => setState(() => _hasDiscount = v),
-                            activeThumbColor: Colors.orange,
-                          ),
-                        ],
-                      ),
-                      if (_hasDiscount) ...[
-                        const SizedBox(height: 12),
-                        CustomTextField(
-                          label: 'Discount %',
-                          hint: 'e.g. 20',
-                          controller: _discountCtrl,
-                          keyboardType: TextInputType.number,
-                          prefixIcon: Icons.percent_rounded,
-                          validator: _hasDiscount
-                              ? (v) {
-                                  if (v!.isEmpty) return 'Enter discount %';
-                                  final d = double.tryParse(v);
-                                  if (d == null || d <= 0 || d >= 100) {
-                                    return 'Enter 1–99';
-                                  }
-                                  return null;
-                                }
-                              : null,
-                        ),
-                        const SizedBox(height: 8),
-                        if (_priceCtrl.text.isNotEmpty &&
-                            _discountCtrl.text.isNotEmpty) ...[
-                          Builder(builder: (_) {
-                            final p = double.tryParse(_priceCtrl.text) ?? 0;
-                            final d = double.tryParse(_discountCtrl.text) ?? 0;
-                            final discounted = p * (1 - d / 100);
-                            return Text(
-                              'Customer pays: Rs. ${discounted.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.bold),
-                            );
-                          }),
-                        ],
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Category (scrollable chips) ───────────────────────────
+              // ── Category (quick) ──────────────────────────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -1464,75 +992,46 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Ek category choose karein. Custom category par long-press se delete.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.3,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
                     const SizedBox(height: 10),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
                           for (final cat in categories) ...[
-                            Builder(
-                              builder: (context) {
-                                final selected = _selectedCategory == cat;
-                                final isCustom =
-                                    customCategories.contains(cat);
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: GestureDetector(
-                                    onLongPress: isCustom
-                                        ? () => _confirmDeleteCategory(
-                                              context,
-                                              bizId: bizId,
-                                              category: cat,
-                                              categories: categories,
-                                            )
-                                        : null,
-                                    child: ChoiceChip(
-                                      label: Text(
-                                        cat,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: selected
-                                              ? bizColor
-                                              : AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      selected: selected,
-                                      onSelected: (ok) {
-                                        if (ok) {
-                                          setState(
-                                              () => _selectedCategory = cat);
-                                        }
-                                      },
-                                      selectedColor:
-                                          bizColor.withValues(alpha: 0.14),
-                                      backgroundColor: AppColors.backgroundLight,
-                                      side: BorderSide(
-                                        color: selected
-                                            ? bizColor
-                                            : AppColors.border,
-                                        width: selected ? 2 : 1,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                    ),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(
+                                  cat,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: _selectedCategory == cat
+                                        ? bizColor
+                                        : AppColors.textPrimary,
                                   ),
-                                );
-                              },
+                                ),
+                                selected: _selectedCategory == cat,
+                                onSelected: (ok) {
+                                  if (!ok) return;
+                                  setState(() => _selectedCategory = cat);
+                                },
+                                selectedColor: bizColor.withValues(alpha: 0.14),
+                                backgroundColor: AppColors.backgroundLight,
+                                side: BorderSide(
+                                  color: _selectedCategory == cat
+                                      ? bizColor
+                                      : AppColors.border,
+                                  width: _selectedCategory == cat ? 2 : 1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                              ),
                             ),
                           ],
                         ],
@@ -1541,6 +1040,507 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   ],
                 ),
               ),
+
+              const SizedBox(height: 16),
+
+              // ── More options (collapsed) ──────────────────────────────
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+                  collapsedBackgroundColor: Colors.white,
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: AppColors.border),
+                  ),
+                  collapsedShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: AppColors.border),
+                  ),
+                  leading: Icon(Icons.tune_rounded, color: bizColor),
+                  title: const Text(
+                    'More options',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Description, discount, unit, bundle, specials…',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                  children: [
+                    const SizedBox(height: 10),
+                    CustomTextField(
+                      label: 'Description (optional)',
+                      hint: isService
+                          ? 'What does this service include?'
+                          : isFood
+                              ? 'Ingredients / short description...'
+                              : 'Brief product description...',
+                      controller: _descCtrl,
+                      maxLines: 3,
+                      prefixIcon: Icons.description_outlined,
+                      validator: null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Keep existing advanced sections below (bundle/discount/unit/etc.)
+                    if (showBundle) ...[
+                      // ── Package / Combo builder ───────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.all_inclusive_rounded,
+                                    color: bizColor, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    isFood ? 'Combo' : 'Package',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                Switch(
+                                  value: _isBundle,
+                                  activeThumbColor: bizColor,
+                                  onChanged: (v) => setState(() {
+                                    _isBundle = v;
+                                    if (!v) _bundleItems.clear();
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              isFood
+                                  ? 'Enable to create a combo that includes multiple items.'
+                                  : 'Enable to bundle multiple items in one package.',
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                            if (_isBundle) ...[
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  ..._bundleItems.map((t) => Chip(
+                                        label: Text(t),
+                                        onDeleted: () =>
+                                            setState(() => _bundleItems.remove(t)),
+                                      )),
+                                  ActionChip(
+                                    label: Text(isFood
+                                        ? '+ Add combo items'
+                                        : '+ Add package items'),
+                                    avatar: const Icon(Icons.add_rounded, size: 18),
+                                    onPressed: () => _pickBundleItems(
+                                      context,
+                                      existing: existing,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Included items: ${_bundleItems.length}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.textHint),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Ramzan / Valentines toggles, Gym options, Unit, Pharmacy slabs, Discount ──
+                    // (existing code below remains, just moved into this ExpansionTile)
+                    if (_showRamzanToggle(bizId) && !_isFlowerShop(bizId))
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.celebration_rounded, color: bizColor, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Ramzan Special',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Mark this as Ramzan offer',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _isRamzanSpecial,
+                              activeThumbColor: bizColor,
+                              onChanged: (v) => setState(() => _isRamzanSpecial = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_isFlowerShop(bizId))
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.favorite_rounded, color: Colors.red, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Valentine's Special",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    "Mark this as Valentine's Day offer",
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _isValentinesSpecial,
+                              activeThumbColor: Colors.red,
+                              onChanged: (v) =>
+                                  setState(() => _isValentinesSpecial = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_showRamzanToggle(bizId) || _isFlowerShop(bizId))
+                      const SizedBox(height: 16),
+
+                    if (isGym) ...[
+                      if (isGymMembership ||
+                          _selectedCategory == 'Group Classes' ||
+                          _selectedCategory == 'Diet Plans') ...[
+                        const Text('Package Duration',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary)),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _gymDurations.map((d) {
+                            final sel = _gymPackageDuration == d;
+                            return GestureDetector(
+                              onTap: () => setState(() => _gymPackageDuration = d),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: sel ? bizColor : bizColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  d,
+                                  style: TextStyle(
+                                    color: sel ? Colors.white : bizColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      if (isGymMembership) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: bizColor.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                                color: bizColor.withValues(alpha: 0.25)),
+                          ),
+                          child: Row(children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _gymWithTrainer ? bizColor : Colors.grey.shade200,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.sports_gymnastics_rounded,
+                                color: _gymWithTrainer ? Colors.white : Colors.grey,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Includes Personal Trainer',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: AppColors.textPrimary)),
+                                  Text(
+                                    _gymWithTrainer
+                                        ? 'Dedicated trainer assigned'
+                                        : 'Self-workout only',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _gymWithTrainer,
+                              onChanged: (v) => setState(() => _gymWithTrainer = v),
+                              activeThumbColor: bizColor,
+                            ),
+                          ]),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ],
+
+                    if (isShop) ...[
+                      const Text('Unit / Pricing',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary)),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ...(_isFlowerShop(bizId) ? _flowerUnits : _units).map((u) {
+                            final selected = _selectedUnit == u;
+                            return GestureDetector(
+                              onTap: () => setState(() => _selectedUnit = u),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: selected ? bizColor : bizColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  u,
+                                  style: TextStyle(
+                                    color: selected ? Colors.white : bizColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                          ActionChip(
+                            label: const Text('Custom unit'),
+                            avatar: const Icon(Icons.edit_rounded, size: 18),
+                            onPressed: () => _setCustomUnit(context, bizColor),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Selected: $_selectedUnit',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (isPharmacy) ...[
+                      // Pharmacy slab block (existing behavior)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: Colors.teal.withValues(alpha: 0.35)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.savings_outlined, color: bizColor, size: 20),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Discount slab',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: AppColors.textPrimary),
+                                  ),
+                                ),
+                                Switch(
+                                  value: _hasDiscount,
+                                  onChanged: (v) => setState(() => _hasDiscount = v),
+                                  activeThumbColor: bizColor,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Example: bill ≥ Rs. 5,000 → 5% off.',
+                              style: TextStyle(
+                                  fontSize: 11, color: AppColors.textSecondary),
+                            ),
+                            if (_hasDiscount) ...[
+                              const SizedBox(height: 12),
+                              CustomTextField(
+                                label: 'Minimum bill (Rs.)',
+                                hint: 'e.g. 5000',
+                                controller: _minOrderCtrl,
+                                keyboardType: TextInputType.number,
+                                prefixIcon: Icons.shopping_cart_outlined,
+                              ),
+                              const SizedBox(height: 12),
+                              CustomTextField(
+                                label: 'Discount %',
+                                hint: 'e.g. 5',
+                                controller: _discountCtrl,
+                                keyboardType: TextInputType.number,
+                                prefixIcon: Icons.percent_rounded,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (showStandardDiscount) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.local_offer_rounded,
+                                    color: Colors.orange, size: 20),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text('Add Discount / Deal',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: AppColors.textPrimary)),
+                                ),
+                                Switch(
+                                  value: _hasDiscount,
+                                  onChanged: (v) => setState(() => _hasDiscount = v),
+                                  activeThumbColor: Colors.orange,
+                                ),
+                              ],
+                            ),
+                            if (_hasDiscount) ...[
+                              const SizedBox(height: 12),
+                              CustomTextField(
+                                label: 'Discount %',
+                                hint: 'e.g. 20',
+                                controller: _discountCtrl,
+                                keyboardType: TextInputType.number,
+                                prefixIcon: Icons.percent_rounded,
+                                validator: _hasDiscount
+                                    ? (v) {
+                                        if (v!.isEmpty) return 'Enter discount %';
+                                        final d = double.tryParse(v);
+                                        if (d == null || d <= 0 || d >= 100) {
+                                          return 'Enter 1–99';
+                                        }
+                                        return null;
+                                      }
+                                    : null,
+                              ),
+                              const SizedBox(height: 8),
+                              if (_priceCtrl.text.isNotEmpty &&
+                                  _discountCtrl.text.isNotEmpty) ...[
+                                Builder(builder: (_) {
+                                  final p = double.tryParse(_priceCtrl.text) ?? 0;
+                                  final d = double.tryParse(_discountCtrl.text) ?? 0;
+                                  final discounted = p * (1 - d / 100);
+                                  return Text(
+                                    'Customer pays: Rs. ${discounted.toStringAsFixed(0)}',
+                                    style: const TextStyle(
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold),
+                                  );
+                                }),
+                              ],
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ],
+                ),
+              ),
+
+              // ── Package / Combo builder ───────────────────────────────
               if (bizId == 'rentacar') ...[
                 const SizedBox(height: 10),
                 Text(

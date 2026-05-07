@@ -1,5 +1,6 @@
 import '../core/api/api_client.dart';
 import '../core/api/api_exception.dart';
+import '../core/api/api_paths.dart';
 import '../core/config/offline_mode.dart';
 import '../models/business.dart';
 import 'booking_repository.dart';
@@ -13,7 +14,7 @@ class BookingRepositoryApi implements BookingRepository {
   Future<List<CustomerBooking>> listBookings({String? userId}) async {
     if (OfflineMode.enabled) return const [];
     final res = await _api.getJson(
-      '/bookings',
+      ApiPaths.bookings,
       query: userId == null ? null : {'userId': userId},
     );
 
@@ -32,7 +33,7 @@ class BookingRepositoryApi implements BookingRepository {
     if (OfflineMode.enabled) {
       throw ApiException('Offline mode: booking API disabled');
     }
-    final res = await _api.postJson('/bookings', body: booking.toJson());
+    final res = await _api.postJson(ApiPaths.bookings, body: booking.toJson());
     final data = res['data'];
     if (data is Map) {
       return CustomerBooking.fromJson(data.cast<String, dynamic>());

@@ -39,6 +39,29 @@ const List<String> kWorkerProfessions = [
   'Painter',
   'Mechanic',
   'AC Technician',
+  /// Collects scrap / kabar from homes; rates shown on Near Me profile (PKR).
+  'Kabariwala · scrap buyer',
+];
+
+/// True for workers who buy scrap / kabar (show rate editor in service app).
+bool professionIsKabariScrap(String? profession) {
+  if (profession == null || profession.trim().isEmpty) return false;
+  final p = profession.toLowerCase();
+  return p.contains('kabari') ||
+      p.contains('scrap') ||
+      p.contains('kabadi') ||
+      p.contains('kabad');
+}
+
+/// Default material lines in the kabari rate editor (PKR per kg or best).
+const List<String> kKabariScrapMaterialRows = [
+  'Plastic (PET / bottles)',
+  'Paper / cardboard',
+  'Iron / steel scrap',
+  'Aluminium',
+  'Bossi / mixed kabar',
+  'Glass',
+  'Copper',
 ];
 
 const List<WorkerPlanInfo> kWorkerPlans = [

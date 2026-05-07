@@ -25,6 +25,8 @@ class LoginForm extends StatelessWidget {
     required this.onLogin,
     required this.isSubmitting,
     required this.onSwitchToSignUp,
+    this.onInvestorDemo,
+    this.demoRunning = false,
   });
 
   final GlobalKey<FormState> formKey;
@@ -38,6 +40,9 @@ class LoginForm extends StatelessWidget {
   final VoidCallback onLogin;
   final bool isSubmitting;
   final VoidCallback onSwitchToSignUp;
+  /// Optional scripted app tour for investors / screen recording.
+  final VoidCallback? onInvestorDemo;
+  final bool demoRunning;
 
   @override
   Widget build(BuildContext context) {
@@ -149,10 +154,34 @@ class LoginForm extends StatelessWidget {
             ),
           ],
           Consumer<AuthProvider>(
-            builder: (context, auth, _) => CustomButton(
-              label: AppStrings.login,
-              onPressed: onLogin,
-              isLoading: auth.isLoading || isSubmitting,
+            builder: (context, auth, _) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CustomButton(
+                  label: AppStrings.login,
+                  onPressed: onLogin,
+                  isLoading:
+                      auth.isLoading || isSubmitting || demoRunning,
+                ),
+                if (onInvestorDemo != null) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: (auth.isLoading ||
+                            isSubmitting ||
+                            demoRunning)
+                        ? null
+                        : onInvestorDemo,
+                    icon: demoRunning
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.slideshow_outlined, size: 20),
+                    label: Text(demoRunning ? 'Demo…' : 'Demo'),
+                  ),
+                ],
+              ],
             ),
           ),
           if (loginUserType == UserType.businessOwner) ...[

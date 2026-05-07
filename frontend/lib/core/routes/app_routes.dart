@@ -21,6 +21,8 @@ class AppRoutes {
   static const String customerSettings = '/customer-settings';
   static const String serviceWorkerHome = '/service-worker-home';
   static const String serviceWorkerLiveMap = '/service-worker-live-map';
+  /// Kabari / scrap buyer: edit PKR rates shown to customers on Near Me.
+  static const String scrapRatesEditor = '/scrap-rates-editor';
   static const String riderHome = '/rider-home';
   static const String riderTeam = '/rider-team';
   static const String riderLogin = '/rider-login';

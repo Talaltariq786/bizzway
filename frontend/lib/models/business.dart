@@ -69,6 +69,9 @@ class Business {
   final double? deliveryBaseCharge;   // Rs. fixed base fee
   final double? deliveryPerKmCharge;  // Rs. per km
   final double? deliveryRadiusKm;     // Owner-defined delivery radius (used for tiered pricing)
+  /// Server + owner: shop closed on purpose (ignores "open hours" for display).
+  final bool shopManuallyClosed;
+  final String? shopClosedReason;
 
   const Business({
     required this.id,
@@ -86,6 +89,8 @@ class Business {
     this.deliveryBaseCharge,
     this.deliveryPerKmCharge,
     this.deliveryRadiusKm,
+    this.shopManuallyClosed = false,
+    this.shopClosedReason,
   });
 
   bool get hasDelivery =>
@@ -123,6 +128,8 @@ class Business {
       }
     }
     final safeType = typeId.isEmpty ? 'others' : typeId;
+    final manual = m['shopManuallyClosed'] == true;
+    final reasonRaw = m['shopClosedReason']?.toString().trim();
     return Business(
       id: (m['id'] ?? '').toString(),
       name: (m['name'] ?? 'Shop').toString(),
@@ -130,7 +137,7 @@ class Business {
       rating: 0,
       reviewCount: 0,
       businessTypeId: safeType,
-      isOpen: true,
+      isOpen: !manual,
       items: items,
       color: match?.color ?? const Color(0xFF6C63FF),
       tagline: null,
@@ -139,6 +146,8 @@ class Business {
       deliveryBaseCharge: null,
       deliveryPerKmCharge: null,
       deliveryRadiusKm: null,
+      shopManuallyClosed: manual,
+      shopClosedReason: (reasonRaw != null && reasonRaw.isNotEmpty) ? reasonRaw : null,
     );
   }
 

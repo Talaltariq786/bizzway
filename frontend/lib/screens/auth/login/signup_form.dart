@@ -14,6 +14,105 @@ import 'rider_signup_widgets.dart';
 import 'role_tabs.dart';
 import 'service_branch_switcher.dart';
 
+String? _validateFullName(String? v) {
+  final t = (v ?? '').trim();
+  if (t.length < 2) return 'Poora naam likhein (kam az kam 2 characters)';
+  return null;
+}
+
+String? _validatePkPhone(String? v) {
+  final digits = (v ?? '').replaceAll(RegExp(r'\D'), '');
+  if (digits.length < 10 || digits.length > 15) {
+    return 'Valid phone: 10–15 digits (e.g. 03001234567)';
+  }
+  return null;
+}
+
+String? _validateBusinessEmail(String? v) {
+  final t = (v ?? '').trim();
+  if (t.isEmpty) return 'Email zaroori hai';
+  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(t)) {
+    return 'Sahi email format (e.g. naam@gmail.com)';
+  }
+  return null;
+}
+
+class _NicDocTile extends StatelessWidget {
+  const _NicDocTile({
+    required this.label,
+    required this.file,
+    required this.onTap,
+  });
+
+  final String label;
+  final XFile? file;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final picked = file != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: picked ? AppColors.primary : AppColors.border,
+            width: picked ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: picked
+                    ? AppColors.primaryLight
+                    : AppColors.backgroundLight,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                picked ? Icons.check_circle_rounded : Icons.credit_card_rounded,
+                color: picked ? AppColors.primary : AppColors.textSecondary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    picked ? 'Photo selected' : 'Tap to upload',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.upload_rounded, color: AppColors.textHint, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class SignupForm extends StatelessWidget {
   const SignupForm({
     super.key,
@@ -28,6 +127,8 @@ class SignupForm extends StatelessWidget {
     required this.riderNicCtrl,
     required this.riderBikeCtrl,
     required this.workerImage,
+    required this.workerNicFrontImage,
+    required this.workerNicBackImage,
     required this.riderLicenseImage,
     required this.riderNicImage,
     required this.selectedUserType,
@@ -44,6 +145,8 @@ class SignupForm extends StatelessWidget {
     required this.onRiderAgreeToggle,
     required this.onRiderAgreeCheckbox,
     required this.onPickWorkerImage,
+    required this.onPickWorkerNicFrontImage,
+    required this.onPickWorkerNicBackImage,
     required this.onPickRiderLicenseImage,
     required this.onPickRiderNicImage,
     required this.onSignUp,
@@ -64,6 +167,8 @@ class SignupForm extends StatelessWidget {
   final TextEditingController riderNicCtrl;
   final TextEditingController riderBikeCtrl;
   final XFile? workerImage;
+  final XFile? workerNicFrontImage;
+  final XFile? workerNicBackImage;
   final XFile? riderLicenseImage;
   final XFile? riderNicImage;
   final UserType selectedUserType;
@@ -80,6 +185,8 @@ class SignupForm extends StatelessWidget {
   final VoidCallback onRiderAgreeToggle;
   final ValueChanged<bool?> onRiderAgreeCheckbox;
   final VoidCallback onPickWorkerImage;
+  final VoidCallback onPickWorkerNicFrontImage;
+  final VoidCallback onPickWorkerNicBackImage;
   final VoidCallback onPickRiderLicenseImage;
   final VoidCallback onPickRiderNicImage;
   final VoidCallback onSignUp;
@@ -143,7 +250,7 @@ class SignupForm extends StatelessWidget {
             hint: 'e.g. Muhammad Ali Khan',
             controller: nameCtrl,
             prefixIcon: Icons.person_outline,
-            validator: (v) => v!.isEmpty ? 'Please enter your name' : null,
+            validator: _validateFullName,
           ),
           const SizedBox(height: 10),
           if (selectedUserType == UserType.customer) ...[
@@ -153,8 +260,7 @@ class SignupForm extends StatelessWidget {
               controller: phoneCtrl,
               keyboardType: TextInputType.phone,
               prefixIcon: Icons.phone_outlined,
-              validator: (v) =>
-                  v!.isEmpty ? 'Please enter your phone number' : null,
+              validator: _validatePkPhone,
             ),
             const SizedBox(height: 10),
             CustomTextField(
@@ -247,14 +353,34 @@ class SignupForm extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _NicDocTile(
+                      label: 'CNIC front',
+                      file: workerNicFrontImage,
+                      onTap: onPickWorkerNicFrontImage,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _NicDocTile(
+                      label: 'CNIC back',
+                      file: workerNicBackImage,
+                      onTap: onPickWorkerNicBackImage,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               CustomTextField(
                 label: 'Phone Number',
                 hint: '03001234567',
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
                 prefixIcon: Icons.phone_outlined,
-                validator: (v) =>
-                    v!.isEmpty ? 'Please enter your phone number' : null,
+                validator: _validatePkPhone,
               ),
               const SizedBox(height: 12),
               CustomTextField(
@@ -273,8 +399,14 @@ class SignupForm extends StatelessWidget {
                 controller: workerNicCtrl,
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.badge_outlined,
-                validator: (v) =>
-                    v!.isEmpty ? 'Please enter CNIC number' : null,
+                validator: (v) {
+                  final t = (v ?? '').trim();
+                  if (t.isEmpty) return 'Please enter CNIC number';
+                  // basic sanity: 13 digits (with or without dashes)
+                  final digits = t.replaceAll(RegExp(r'\D'), '');
+                  if (digits.length < 13) return 'Valid CNIC daalen';
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -371,8 +503,7 @@ class SignupForm extends StatelessWidget {
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
                 prefixIcon: Icons.phone_outlined,
-                validator: (v) =>
-                    v!.isEmpty ? 'Please enter your phone number' : null,
+                validator: _validatePkPhone,
               ),
               const SizedBox(height: 12),
               CustomTextField(
@@ -512,8 +643,7 @@ class SignupForm extends StatelessWidget {
                 controller: signupEmailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 prefixIcon: Icons.email_outlined,
-                validator: (v) =>
-                    v!.isEmpty ? 'Please enter your email' : null,
+                validator: _validateBusinessEmail,
               ),
               const SizedBox(height: 8),
               CustomTextField(
@@ -523,7 +653,9 @@ class SignupForm extends StatelessWidget {
                 isPassword: true,
                 prefixIcon: Icons.lock_outline,
                 validator: (v) =>
-                    v!.length < 6 ? 'Min 6 characters required' : null,
+                    (v ?? '').trim().length < 6
+                        ? 'Min 6 characters required'
+                        : null,
               ),
             ],
           ],

@@ -13,7 +13,15 @@ import '../../widgets/orders/assign_rider_sheet.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order order;
-  const OrderDetailScreen({super.key, required this.order});
+
+  /// Guided tour only: opens assign-rider sheet after the screen renders.
+  final bool investorDemoAutoOpenAssignSheet;
+
+  const OrderDetailScreen({
+    super.key,
+    required this.order,
+    this.investorDemoAutoOpenAssignSheet = false,
+  });
 
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
@@ -28,6 +36,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     super.initState();
     _status = widget.order.status;
     _etaCtrl.text = widget.order.etaMinutes?.toString() ?? '';
+    if (widget.investorDemoAutoOpenAssignSheet &&
+        widget.order.isDelivery &&
+        widget.order.status != OrderStatus.completed &&
+        widget.order.status != OrderStatus.cancelled &&
+        (widget.order.assignedRiderName ?? '').trim().isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 2600), () async {
+          if (!mounted) return;
+          await assignRiderToOrder(context, widget.order.id);
+        });
+      });
+    }
   }
 
   @override
@@ -243,8 +263,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         label: Text(
                           (o.assignedRiderName == null ||
                                   (o.assignedRiderName ?? '').isEmpty)
-                              ? 'Rider assign karein'
-                              : 'Rider change karein',
+                              ? 'Assign rider'
+                              : 'Change rider',
                         ),
                       ),
                     ),
@@ -345,7 +365,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                   const SizedBox(height: 10),
                 DropdownButtonFormField<OrderStatus>(
-                  value: _status,
+                  key: ValueKey(_status),
+                  initialValue: _status,
                   items: OrderStatus.values
                       .map((s) => DropdownMenuItem(
                             value: s,

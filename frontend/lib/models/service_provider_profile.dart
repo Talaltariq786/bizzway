@@ -15,6 +15,9 @@ class ServiceProviderProfile {
   final DateTime? updatedAt;
   final DateTime createdAt;
 
+  /// Material → rate line (e.g. "Plastic" → "Rs 85 / kg") for kabari / scrap buyers.
+  final Map<String, String> scrapRatesDisplay;
+
   const ServiceProviderProfile({
     required this.id,
     required this.name,
@@ -29,6 +32,7 @@ class ServiceProviderProfile {
     this.lng,
     this.updatedAt,
     required this.createdAt,
+    this.scrapRatesDisplay = const {},
   });
 
   IconData get icon {
@@ -39,6 +43,12 @@ class ServiceProviderProfile {
     if (p.contains('paint')) return Icons.format_paint_rounded;
     if (p.contains('mechanic') || p.contains('auto')) return Icons.build_rounded;
     if (p.contains('ac')) return Icons.ac_unit_rounded;
+    if (p.contains('kabari') ||
+        p.contains('scrap') ||
+        p.contains('kabad') ||
+        p.contains('kabadi')) {
+      return Icons.recycling_rounded;
+    }
     return Icons.handyman_rounded;
   }
 
@@ -56,6 +66,7 @@ class ServiceProviderProfile {
         'lng': lng,
         'updatedAt': updatedAt?.toIso8601String(),
         'createdAt': createdAt.toIso8601String(),
+        'scrapRatesDisplay': scrapRatesDisplay,
       };
 
   factory ServiceProviderProfile.fromJson(Map<String, dynamic> json) {
@@ -74,6 +85,15 @@ class ServiceProviderProfile {
       updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()),
       createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
+      scrapRatesDisplay: () {
+        final m = json['scrapRatesDisplay'];
+        if (m is Map) {
+          return Map<String, String>.from(
+            m.map((k, v) => MapEntry(k.toString(), v.toString())),
+          );
+        }
+        return <String, String>{};
+      }(),
     );
   }
 }

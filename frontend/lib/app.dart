@@ -35,6 +35,7 @@ import 'screens/customer/customer_home_screen.dart';
 import 'screens/customer/customer_settings_screen.dart';
 import 'screens/service_worker/service_worker_home_screen.dart';
 import 'screens/service_worker/service_worker_live_map_screen.dart';
+import 'screens/service_worker/scrap_rates_editor_screen.dart';
 import 'screens/rider/rider_home_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/riders/rider_team_screen.dart';
@@ -47,6 +48,8 @@ import 'core/services/provider_background_location.dart';
 
 class BizLabelApp extends StatelessWidget {
   const BizLabelApp({super.key});
+
+  static bool _bgInitScheduled = false;
 
   @override
   Widget build(BuildContext context) {
@@ -73,13 +76,17 @@ class BizLabelApp extends StatelessWidget {
       child: Builder(
         builder: (context) {
           // Init background location (best-effort). Safe to call multiple times.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Future<void>.delayed(const Duration(milliseconds: 800), () {
-              ProviderBackgroundLocation.init(
-                directory: context.read<ServiceProviderDirectoryProvider>(),
-              );
+          if (!_bgInitScheduled) {
+            _bgInitScheduled = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Future<void>.delayed(const Duration(milliseconds: 800), () {
+                if (!context.mounted) return;
+                ProviderBackgroundLocation.init(
+                  directory: context.read<ServiceProviderDirectoryProvider>(),
+                );
+              });
             });
-          });
+          }
 
           return MaterialApp(
             title: AppStrings.appName,
@@ -109,8 +116,10 @@ class BizLabelApp extends StatelessWidget {
               AppRoutes.customerSettings: (_) => const CustomerSettingsScreen(),
               AppRoutes.serviceWorkerHome: (_) =>
                   const ServiceWorkerHomeScreen(),
-            AppRoutes.serviceWorkerLiveMap: (_) =>
-                const ServiceWorkerLiveMapScreen(),
+              AppRoutes.serviceWorkerLiveMap: (_) =>
+                  const ServiceWorkerLiveMapScreen(),
+              AppRoutes.scrapRatesEditor: (_) =>
+                  const ScrapRatesEditorScreen(),
               AppRoutes.riderHome: (_) => const RiderHomeScreen(),
               AppRoutes.riderLogin: (_) => const RiderLoginScreen(),
               AppRoutes.riderTeam: (_) => const RiderTeamScreen(),

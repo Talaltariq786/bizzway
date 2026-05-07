@@ -1,0 +1,13 @@
+# Local MongoDB for Bizzway API (Atlas use karte ho to is stack ki zaroorat nahi).
+# Start: docker compose up -d
+# URI: mongodb://127.0.0.1:27017/bizzway
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - bizzway_mongo_data:/data/db
+
+volumes:
+  bizzway_mongo_data:

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'dart:io' show File;
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/dashboard_header_layout.dart';
+import '../../core/constants/stock_photo_catalog.dart';
 import '../../core/routes/app_routes.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/business_provider.dart';
@@ -78,6 +81,14 @@ class ProfileScreen extends StatelessWidget {
                     context,
                     title: 'Business Settings',
                     children: [
+                      _SettingsTile(
+                        icon: Icons.image_outlined,
+                        label: 'Cover photo',
+                        subtitle: business.businessCoverImagePath.trim().isEmpty
+                            ? 'Add cover photo'
+                            : 'Change cover photo',
+                        onTap: () => _editBusinessCover(context, business),
+                      ),
                       if (business.hasDelivery)
                         _SettingsTile(
                           icon: Icons.delivery_dining_rounded,
@@ -97,6 +108,16 @@ class ProfileScreen extends StatelessWidget {
                         label: 'Business hours',
                         subtitle: business.formattedHours,
                         onTap: () => _editBusinessHours(context, business),
+                      ),
+                      _SettingsTile(
+                        icon: Icons.storefront_outlined,
+                        label: 'Shop manual close',
+                        subtitle: business.shopManuallyClosed
+                            ? (business.shopClosedReason.isNotEmpty
+                                ? 'Abhi band — ${business.shopClosedReason}'
+                                : 'Customer ko time ke bawajood band dikhega')
+                            : 'Time wali opening; mood/issue par yahan se band karein',
+                        onTap: () => _editShopManualClose(context, business),
                       ),
                       _SettingsTile(
                         icon: Icons.qr_code_2_rounded,
@@ -222,11 +243,21 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildBusinessHeader(BuildContext context, BusinessProvider business) {
+    final cover = business.businessCoverImagePath.trim();
+    final isUrl = cover.startsWith('http://') || cover.startsWith('https://');
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
+        image: cover.isEmpty
+            ? null
+            : DecorationImage(
+                image: isUrl ? NetworkImage(cover) : FileImage(File(cover)),
+                fit: BoxFit.cover,
+              ),
         gradient: LinearGradient(
-          colors: AppColors.gradientFrom(business.themeColor),
+          colors: [
+            ...AppColors.gradientFrom(business.themeColor),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -260,6 +291,17 @@ class ProfileScreen extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (cover.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap Cover photo in settings to change',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -283,6 +325,158 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _editBusinessCover(
+    BuildContext context,
+    BusinessProvider business,
+  ) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          14,
+          16,
+          MediaQuery.of(ctx).padding.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Cover photo',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose Food HD'),
+              subtitle: const Text('Pakistan-style cover images'),
+              onTap: () async {
+                final urls = StockPhotoCatalog.coverSuggestionsForBusiness(
+                  business.selectedBusiness?.id ?? 'restaurant',
+                );
+                final u = await showModalBottomSheet<String>(
+                  context: ctx,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (ctx2) => Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                    ),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      14,
+                      16,
+                      MediaQuery.of(ctx2).padding.bottom + 16,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 44,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: AppColors.border,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Choose a cover (HD)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: urls.length,
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 1.1,
+                          ),
+                          itemBuilder: (_, i) {
+                            final uu = urls[i];
+                            return InkWell(
+                              onTap: () => Navigator.pop(ctx2, uu),
+                              borderRadius: BorderRadius.circular(14),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.network(uu, fit: BoxFit.cover),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx, u);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_back_outlined),
+              title: const Text('Upload from gallery'),
+              subtitle: const Text('Use your own shop banner/photo'),
+              onTap: () async {
+                final picker = ImagePicker();
+                final file = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  maxWidth: 2400,
+                  maxHeight: 2400,
+                  imageQuality: 80,
+                );
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx, file?.path);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || picked.trim().isEmpty) return;
+    await business.updateBusinessCoverImagePath(picked.trim());
+    business.debugLogLocalProfile('profile_coverSaved');
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cover photo updated'),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -344,9 +538,10 @@ class ProfileScreen extends StatelessWidget {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                business.updateBusinessName(ctrl.text);
-                Navigator.pop(context);
+              onPressed: () async {
+                await business.updateBusinessName(ctrl.text);
+                business.debugLogLocalProfile('profile_nameSaved');
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
             ),
@@ -402,6 +597,122 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _editShopManualClose(BuildContext context, BusinessProvider business) {
+    var closed = business.shopManuallyClosed;
+    final reasonCtrl = TextEditingController(text: business.shopClosedReason);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom +
+                MediaQuery.of(ctx).padding.bottom +
+                16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Shop abhi band (override)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Kabhi time “open” ho lekin aap band rakhna chahein (mood, stock, break…) — '
+                  'yahan se customer ko “closed” dikhega. Wajah neeche likhein (optional lekin behtar).',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  value: closed,
+                  onChanged: (v) => setSheet(() => closed = v),
+                  title: const Text('Shop abhi ke liye band'),
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: business.themeColor,
+                ),
+                if (closed) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: reasonCtrl,
+                    maxLines: 2,
+                    maxLength: 200,
+                    decoration: InputDecoration(
+                      labelText: 'Wajah (e.g. mood off, jaldi mein, stock count)',
+                      hintText: 'Chhota sa reason…',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await business.setShopManualClose(
+                            closed,
+                            reason: reasonCtrl.text,
+                          );
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: business.themeColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).whenComplete(reasonCtrl.dispose);
   }
 
   void _editBusinessHours(BuildContext context, BusinessProvider business) {
@@ -538,6 +849,7 @@ class ProfileScreen extends StatelessWidget {
                           return;
                         }
                         await business.updateHours(open, close);
+                        business.debugLogLocalProfile('profile_hoursSaved');
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
                       },
@@ -685,6 +997,7 @@ class ProfileScreen extends StatelessWidget {
                             business.deliveryPerKmCharge;
                         await business.updateDeliveryRadius(radius);
                         await business.updateDeliveryCharges(base, perKm);
+                        business.debugLogLocalProfile('profile_deliverySaved');
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
                       },

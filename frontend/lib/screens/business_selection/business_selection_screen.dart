@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'dart:io' show File;
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/stock_photo_catalog.dart';
+import '../../core/maps/map_location_picker_screen.dart';
+import '../../core/maps/map_location_result.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/demo/demo_typewriter.dart';
 import '../../models/business_type.dart';
 import '../../providers/business_provider.dart';
 
@@ -230,11 +236,44 @@ class _BusinessCard extends StatelessWidget {
   }
 }
 
+/// Investor recording: same onboarding sheet as a live business tap, with auto-type + captions.
+Future<void> openInvestorDemoBusinessSetupSheet(
+  BuildContext context, {
+  String businessTypeId = 'grocery',
+}) async {
+  final businesses = BusinessType.all
+      .where((b) => !BusinessType.excludedFromOwnerSelection.contains(b.id))
+      .toList();
+  final match =
+      businesses.where((b) => b.id == businessTypeId).toList();
+  final type =
+      match.isNotEmpty ? match.first : businesses.first;
+  // Keep provider in sync so downstream screens (catalog/orders/team riders) have a business id.
+  try {
+    await context.read<BusinessProvider>().selectBusiness(type);
+  } catch (_) {}
+  if (!context.mounted) return;
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _BusinessSetupSheet(
+      type: type,
+      investorDemoFill: true,
+    ),
+  );
+}
+
 // ── Multi-step setup bottom sheet ─────────────────────────────────────────────
 
 class _BusinessSetupSheet extends StatefulWidget {
   final BusinessType type;
-  const _BusinessSetupSheet({required this.type});
+  final bool investorDemoFill;
+
+  const _BusinessSetupSheet({
+    required this.type,
+    this.investorDemoFill = false,
+  });
 
   @override
   State<_BusinessSetupSheet> createState() => _BusinessSetupSheetState();
@@ -244,25 +283,259 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
   int _step = 0;
   final _nameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final _imagePicker = ImagePicker();
+  String? _coverValue; // file path OR https URL
   TimeOfDay _openTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _closeTime = const TimeOfDay(hour: 22, minute: 0);
   double _radiusKm = BusinessProvider.maxDeliveryRadiusKm;
-  String _selectedPlan = 'free';
+  double _pinLat = BusinessProvider.defaultBusinessLat;
+  double _pinLng = BusinessProvider.defaultBusinessLng;
+  bool _pinSet = false;
+  bool _seededFromProvider = false;
+  String _investorCaption = '';
 
   bool get _hasDelivery =>
       ['restaurant', 'cafe', 'grocery', 'pharmacy', 'others']
           .contains(widget.type.id);
 
-  // Subscription is always the last step for everyone
-  int get _totalSteps => _hasDelivery ? 4 : 3;
+  /// Name + address + map, hours, [delivery radius]. No paid plan — always free.
+  int get _totalSteps => _hasDelivery ? 3 : 2;
 
   Color get _color => widget.type.color;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.investorDemoFill) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _runInvestorDemoFill();
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_seededFromProvider) return;
+    _seededFromProvider = true;
+    final b = context.read<BusinessProvider>();
+    _pinLat = b.businessLat;
+    _pinLng = b.businessLng;
+    if (b.businessName.trim().isNotEmpty) {
+      _nameCtrl.text = b.businessName;
+    }
+    if (b.businessAddress.trim().isNotEmpty) {
+      _addressCtrl.text = b.businessAddress;
+    }
+    if (b.businessPinConfirmed) {
+      _pinSet = true;
+    }
+    if ((_coverValue ?? '').isEmpty && b.businessCoverImagePath.trim().isNotEmpty) {
+      _coverValue = b.businessCoverImagePath.trim();
+    }
+  }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _runInvestorDemoFill() async {
+    if (!widget.investorDemoFill || !mounted) return;
+
+    Future<void> caption(String s) async {
+      if (!mounted) return;
+      setState(() => _investorCaption = s);
+      await Future<void>.delayed(const Duration(milliseconds: 320));
+    }
+
+    await caption(
+      'Enter the display name — the cover image is the hero customers see first.',
+    );
+    await DemoTypewriter.fill(
+      _nameCtrl,
+      'Karachi Demo Mart',
+      shouldAbort: () => !mounted,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 520));
+    final urls = StockPhotoCatalog.coverSuggestionsForBusiness(widget.type.id);
+    if (!mounted) return;
+    if (urls.isNotEmpty) setState(() => _coverValue = urls.first);
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+
+    await caption(
+      'Address and map pin — fixes your listing on Near Me and dispatch distance.',
+    );
+    await DemoTypewriter.fill(
+      _addressCtrl,
+      'Block 6, Gulistan-e-Jauhar, Karachi',
+      shouldAbort: () => !mounted,
+    );
+    if (!mounted) return;
+    setState(() {
+      _pinLat = 24.9056;
+      _pinLng = 67.1483;
+      _pinSet = true;
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 1600));
+
+    if (!_hasDelivery) {
+      await caption(
+        'Demo ends here — you can close the sheet.',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 3200));
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    await caption(
+      'Operating hours — customers only see you as open inside this window.',
+    );
+    if (!mounted) return;
+    setState(() {
+      _step = 1;
+      _openTime = const TimeOfDay(hour: 10, minute: 0);
+      _closeTime = const TimeOfDay(hour: 23, minute: 30);
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 3200));
+
+    await caption(
+      'Delivery radius — maximum distance you deliver (up to '
+      '${BusinessProvider.maxDeliveryRadiusKm.toStringAsFixed(0)} km).',
+    );
+    if (!mounted) return;
+    setState(() {
+      _step = 2;
+      _radiusKm = 4;
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 4500));
+
+    await caption(
+      'Launch Business opens the dashboard — this demo closes the sheet automatically.',
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 3800));
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _pickShopPin() async {
+    final r = await Navigator.of(context).push<MapLocationResult>(
+      MaterialPageRoute<MapLocationResult>(
+        fullscreenDialog: true,
+        builder: (_) => MapLocationPickerScreen(
+          initialLat: _pinLat,
+          initialLng: _pinLng,
+          title: 'Shop location',
+        ),
+      ),
+    );
+    if (r == null || !mounted) return;
+    setState(() {
+      _pinLat = r.lat;
+      _pinLng = r.lng;
+      _pinSet = true;
+      if (_addressCtrl.text.trim().isEmpty &&
+          r.addressLine.trim().isNotEmpty) {
+        _addressCtrl.text = r.addressLine.trim();
+      }
+    });
+  }
+
+  Future<void> _pickCoverImage() async {
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2400,
+      maxHeight: 2400,
+      imageQuality: 80,
+    );
+    if (file == null || !mounted) return;
+    setState(() => _coverValue = file.path);
+  }
+
+  Future<void> _chooseCoverFromLibrary() async {
+    final urls = StockPhotoCatalog.coverSuggestionsForBusiness(widget.type.id);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          14,
+          16,
+          MediaQuery.of(ctx).padding.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Choose a cover (HD)',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Pakistan-style food images — crisp header look.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: urls.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1.1,
+              ),
+              itemBuilder: (_, i) {
+                final u = urls[i];
+                return InkWell(
+                  onTap: () => Navigator.pop(ctx, u),
+                  borderRadius: BorderRadius.circular(14),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(u, fit: BoxFit.cover),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _coverValue = picked);
+  }
+
+  bool _isUrl(String s) => s.startsWith('http://') || s.startsWith('https://');
+
+  ImageProvider? _coverProvider() {
+    final v = (_coverValue ?? '').trim();
+    if (v.isEmpty) return null;
+    if (_isUrl(v)) return NetworkImage(v);
+    return FileImage(File(v));
   }
 
   String _fmt(TimeOfDay t) {
@@ -294,13 +567,38 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
   }
 
   Future<void> _finish() async {
+    if ((_coverValue ?? '').trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Cover photo zaroor upload karein (shop/profile header).'),
+          backgroundColor: widget.type.color,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() => _step = 0);
+      return;
+    }
+    if (!_pinSet) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Map se shop ki location pin karein — Near Me ke liye zaroori.'),
+          backgroundColor: widget.type.color,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() => _step = 0);
+      return;
+    }
     final biz = context.read<BusinessProvider>();
     await biz.updateBusinessName(
         _nameCtrl.text.trim().isEmpty ? widget.type.title : _nameCtrl.text.trim());
     await biz.updateBusinessAddress(_addressCtrl.text.trim());
+    await biz.updateBusinessCoverImagePath(_coverValue!.trim());
+    await biz.updateBusinessPin(_pinLat, _pinLng);
     await biz.updateHours(_openTime, _closeTime);
     if (_hasDelivery) await biz.updateDeliveryRadius(_radiusKm);
-    await biz.updateSubscription(_selectedPlan);
+    await biz.updateSubscription('free');
+    biz.debugLogLocalProfile('setupSheet_saved→prefs');
     if (!mounted) return;
     Navigator.pop(context);
     Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
@@ -308,7 +606,7 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final sheet = Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -401,16 +699,49 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
         ],
       ),
     );
+
+    if (!widget.investorDemoFill) return sheet;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        sheet,
+        if (_investorCaption.trim().isNotEmpty)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: MediaQuery.of(context).padding.bottom + 8,
+            child: Material(
+              elevation: 10,
+              borderRadius: BorderRadius.circular(14),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Text(
+                  _investorCaption,
+                  style: const TextStyle(
+                    fontSize: 12.8,
+                    height: 1.42,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildStep(int step) {
-    // Subscription is always the last step
-    if (step == _totalSteps - 1) return _stepSubscription();
     switch (step) {
-      case 0: return _stepNameAddress();
-      case 1: return _stepHours();
-      case 2: return _stepDelivery();
-      default: return const SizedBox.shrink();
+      case 0:
+        return _stepNameAddress();
+      case 1:
+        return _stepHours();
+      case 2:
+        return _stepDelivery();
+      default:
+        return const SizedBox.shrink();
     }
   }
 
@@ -443,6 +774,95 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
           ]),
         ]),
         const SizedBox(height: 24),
+        GestureDetector(
+          onTap: _pickCoverImage,
+          child: Container(
+            height: 128,
+            decoration: BoxDecoration(
+              color: AppColors.backgroundLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+              image: _coverProvider() == null
+                  ? null
+                  : DecorationImage(image: _coverProvider()!, fit: BoxFit.cover),
+            ),
+            child: (_coverValue ?? '').trim().isNotEmpty
+                ? Align(
+                    alignment: Alignment.topRight,
+                    child: Container(
+                      margin: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_rounded, size: 14, color: Colors.white),
+                          SizedBox(width: 6),
+                          Text(
+                            'Change cover',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.photo_camera_back_rounded,
+                          color: _color,
+                          size: 26,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Upload cover photo',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Yeh customer ko header me nazar aayegi',
+                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _chooseCoverFromLibrary,
+                icon: const Icon(Icons.photo_library_outlined, size: 18),
+                label: const Text('Choose Food HD'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: _color.withValues(alpha: 0.5)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         _field(
           controller: _nameCtrl,
           label: 'Business Name',
@@ -455,6 +875,33 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
           label: 'Business Address',
           hint: 'Street, Area, City',
           icon: Icons.location_on_rounded,
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: _pickShopPin,
+          icon: const Icon(Icons.map_rounded, size: 20),
+          label: Text(
+            _pinSet ? 'Update map pin' : 'Set location on map',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+            side: BorderSide(color: _color.withValues(alpha: 0.6)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _pinSet
+              ? 'Pin: ${_pinLat.toStringAsFixed(5)}, ${_pinLng.toStringAsFixed(5)}'
+              : 'Map par pin zaroor set karein taake Near Me sahi kaam kare.',
+          style: TextStyle(
+            fontSize: 12,
+            color: _pinSet ? AppColors.textSecondary : _color,
+            fontWeight: _pinSet ? FontWeight.w500 : FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -621,6 +1068,8 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
     );
   }
 
+  // ── (Paid plans removed — MVP subscription is always free.) ─────────────────
+
   Widget _radiusTip() {
     final r = _radiusKm;
     String tip;
@@ -650,110 +1099,6 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
     );
   }
 
-  // ── Step: Subscription Plan ───────────────────────────────────────────────
-  Widget _stepSubscription() {
-    final plans = [
-      _PlanInfo('free',     'Free',       'Rs. 0',        '/month', Icons.store_outlined,        const Color(0xFF9E9E9E), ['Basic listing', '5 requests/month', 'Standard ranking']),
-      _PlanInfo('starter',  'Starter',    'Rs. 999',      '/month', Icons.rocket_launch_rounded, const Color(0xFF43A047), ['20 requests/month', 'Basic analytics', 'Email support']),
-      _PlanInfo('pro',      'Pro',        'Rs. 2,499',    '/month', Icons.workspace_premium,     const Color(0xFF6C63FF), ['Unlimited requests', 'Priority ranking', 'Push notifications']),
-      _PlanInfo('business', 'Business',   'Rs. 4,999',    '/month', Icons.diamond_rounded,       const Color(0xFFFF9800), ['Featured listing', 'Multiple staff', 'Dedicated support']),
-    ];
-
-    return Column(
-      key: const ValueKey('stepSub'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Choose Your Plan',
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary)),
-        const SizedBox(height: 4),
-        const Text('Start free, upgrade anytime',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-        const SizedBox(height: 18),
-        ...plans.map((p) {
-          final sel = _selectedPlan == p.id;
-          return GestureDetector(
-            onTap: () => setState(() => _selectedPlan = p.id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: sel ? p.color.withValues(alpha: 0.08) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: sel ? p.color : AppColors.border,
-                    width: sel ? 2 : 1),
-              ),
-              child: Row(children: [
-                Container(
-                  width: 42, height: 42,
-                  decoration: BoxDecoration(
-                    color: p.color.withValues(alpha: sel ? 0.18 : 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(p.icon, color: p.color, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Text(p.name,
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: sel ? p.color : AppColors.textPrimary)),
-                        const SizedBox(width: 8),
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                  text: p.price,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: p.color)),
-                              TextSpan(
-                                  text: p.period,
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.textHint)),
-                            ],
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 2,
-                        children: p.features
-                            .map((f) => Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.check_rounded, size: 11, color: p.color),
-                                const SizedBox(width: 2),
-                                Text(f, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                              ],
-                            ))
-                            .toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                if (sel)
-                  Icon(Icons.check_circle_rounded, color: p.color, size: 22),
-              ]),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
   Widget _field({
     required TextEditingController controller,
     required String label,
@@ -775,20 +1120,4 @@ class _BusinessSetupSheetState extends State<_BusinessSetupSheet> {
       ),
     );
   }
-}
-
-// ── Plan info data class ───────────────────────────────────────────────────────
-
-class _PlanInfo {
-  final String id;
-  final String name;
-  final String price;
-  final String period;
-  final IconData icon;
-  final Color color;
-  final List<String> features;
-
-  const _PlanInfo(
-      this.id, this.name, this.price, this.period,
-      this.icon, this.color, this.features);
 }

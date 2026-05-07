@@ -13,6 +13,8 @@ import '../../providers/product_provider.dart';
 import '../../widgets/common/app_asset_image.dart';
 import '../../widgets/common/themed_dialog_wrapper.dart';
 import '../../core/constants/dashboard_header_layout.dart';
+import '../../core/constants/grocery_quick_setup_catalog.dart';
+import '../../core/constants/stock_photo_catalog.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -24,22 +26,28 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen>
     with SingleTickerProviderStateMixin {
   String _selectedCategory = 'All';
+  String _query = '';
+  late final TextEditingController _searchCtrl;
   late TabController _tabCtrl;
   String _lastLoadedBizId = '';
 
   bool _isServiceBiz(String id) => ['salon', 'gym', 'clinic'].contains(id);
   bool _isFoodBiz(String id) => ['restaurant', 'cafe'].contains(id);
   bool _isGymBiz(String id) => id == 'gym';
+  bool _isGroceryLike(String id) =>
+      id == 'grocery' || id == 'pharmacy' || id == 'others';
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
     _tabCtrl.addListener(() => setState(() {}));
+    _searchCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _tabCtrl.dispose();
     super.dispose();
   }
@@ -77,6 +85,12 @@ class _ProductsScreenState extends State<ProductsScreen>
         .where(
           (p) => selectedCategory == 'All' || p.category == selectedCategory,
         )
+        .where((p) {
+          final q = _query.trim().toLowerCase();
+          if (q.isEmpty) return true;
+          return p.name.toLowerCase().contains(q) ||
+              p.category.toLowerCase().contains(q);
+        })
         .toList();
     final deals =
         (bizId.isEmpty
@@ -196,6 +210,107 @@ class _ProductsScreenState extends State<ProductsScreen>
                   ),
                 ),
               ],
+            ),
+          ),
+          if (_isGroceryLike(bizId))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: bizColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.flash_on_rounded,
+                        color: bizColor,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Quick setup',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Pakistan grocery categories + items add karein. Price baad mein quick edit se set karein.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () => _openGroceryQuickSetup(context, bizId, bizColor),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: bizColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.search_rounded, color: AppColors.textHint),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Search by name or category…',
+                        border: InputBorder.none,
+                      ),
+                      onChanged: (v) => setState(() => _query = v),
+                    ),
+                  ),
+                  if (_query.trim().isNotEmpty)
+                    IconButton(
+                      onPressed: () => setState(() {
+                        _query = '';
+                        _searchCtrl.clear();
+                      }),
+                      icon: const Icon(Icons.close_rounded),
+                      color: AppColors.textHint,
+                      tooltip: 'Clear',
+                    ),
+                ],
+              ),
             ),
           ),
           if (isFood)
@@ -452,6 +567,7 @@ class _ProductsScreenState extends State<ProductsScreen>
                       AppRoutes.addProduct,
                       arguments: p,
                     ),
+                    onDuplicate: () => _duplicateProduct(context, p, bizColor),
                     onDelete: () => _confirmDeleteProduct(
                       context,
                       product: p,
@@ -467,6 +583,7 @@ class _ProductsScreenState extends State<ProductsScreen>
                       onToggle: () => context
                           .read<ProductProvider>()
                           .toggleAvailability(p.id),
+                      onQuickEdit: () => _quickEditProduct(context, p, bizColor),
                     ),
                   );
                 },
@@ -517,6 +634,7 @@ class _ProductsScreenState extends State<ProductsScreen>
             AppRoutes.addProduct,
             arguments: p,
           ),
+          onDuplicate: () => _duplicateProduct(context, p, Colors.orange),
           onDelete: () => _confirmDeleteProduct(
             context,
             product: p,
@@ -670,6 +788,338 @@ class _ProductsScreenState extends State<ProductsScreen>
       ),
     );
   }
+
+  void _duplicateProduct(BuildContext context, Product p, Color accent) {
+    final copy = Product(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      businessTypeId: p.businessTypeId,
+      name: '${p.name} (copy)',
+      description: p.description,
+      price: p.price,
+      category: p.category,
+      imageUrl: p.imageUrl,
+      isAvailable: p.isAvailable,
+      discountPercent: p.discountPercent,
+      durationMinutes: p.durationMinutes,
+      unit: p.unit,
+      withTrainer: p.withTrainer,
+      minOrderForDiscount: p.minOrderForDiscount,
+      isRamzanSpecial: p.isRamzanSpecial,
+      isValentinesSpecial: p.isValentinesSpecial,
+      bundleItems: List<String>.from(p.bundleItems),
+    );
+    context.read<ProductProvider>().addProduct(copy);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Duplicated "${p.name}"'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: accent,
+      ),
+    );
+  }
+
+  Future<void> _quickEditProduct(
+    BuildContext context,
+    Product p,
+    Color accent,
+  ) async {
+    final nameCtrl = TextEditingController(text: p.name);
+    final priceCtrl = TextEditingController(text: p.price.toStringAsFixed(0));
+    final descCtrl = TextEditingController(text: p.description);
+    final res = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => wrapDialogWithTheme(
+        ctx,
+        accentColor: accent,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Quick edit',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Price (Rs.)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: descCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (res != true) return;
+    final nextName = nameCtrl.text.trim();
+    final nextPrice = double.tryParse(priceCtrl.text.trim());
+    final nextDesc = descCtrl.text.trim();
+    if (nextName.isEmpty || nextPrice == null) return;
+    if (!context.mounted) return;
+    context.read<ProductProvider>().updateProduct(
+          p.copyWith(name: nextName, price: nextPrice, description: nextDesc),
+        );
+  }
+
+  Future<void> _openGroceryQuickSetup(
+    BuildContext context,
+    String bizId,
+    Color accent,
+  ) async {
+    final selected = <String, Set<String>>{};
+    for (final e in GroceryQuickSetupCatalog.categories.entries) {
+      selected[e.key] = e.value.toSet(); // default: all selected
+    }
+
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          MediaQuery.of(ctx).padding.bottom + 16,
+        ),
+        child: StatefulBuilder(
+          builder: (ctx, setSheet) {
+            int count() =>
+                selected.values.fold<int>(0, (a, s) => a + s.length);
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Grocery quick setup',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Selected: ${count()} items (hidden by default)',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: GroceryQuickSetupCatalog.categories.entries.map((e) {
+                      final cat = e.key;
+                      final items = e.value;
+                      final sel = selected[cat] ?? <String>{};
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundLight,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: ExpansionTile(
+                          initiallyExpanded: false,
+                          title: Text(
+                            cat,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${sel.length}/${items.length} selected',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          trailing: TextButton(
+                            onPressed: () => setSheet(() {
+                              if (sel.length == items.length) {
+                                selected[cat] = <String>{};
+                              } else {
+                                selected[cat] = items.toSet();
+                              }
+                            }),
+                            child: Text(sel.length == items.length ? 'None' : 'All'),
+                          ),
+                          children: [
+                            for (final it in items)
+                              CheckboxListTile(
+                                dense: true,
+                                value: sel.contains(it),
+                                onChanged: (v) => setSheet(() {
+                                  final s = selected[cat] ?? <String>{};
+                                  if (v == true) {
+                                    s.add(it);
+                                  } else {
+                                    s.remove(it);
+                                  }
+                                  selected[cat] = s;
+                                }),
+                                title: Text(it, style: const TextStyle(fontSize: 13)),
+                                controlAffinity: ListTileControlAffinity.leading,
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: count() == 0 ? null : () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accent,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Add items'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+    if (ok != true) return;
+
+    if (!context.mounted) return;
+    final prod = context.read<ProductProvider>();
+    var added = 0;
+    for (final entry in selected.entries) {
+      final category = entry.key;
+      for (final name in entry.value) {
+        final image = StockPhotoCatalog.groceryUrlForLabel(name) ??
+            StockPhotoCatalog.groceryUrlForLabel(category) ??
+            '';
+        prod.addProduct(
+          Product(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            businessTypeId: bizId,
+            name: name,
+            description: '',
+            price: 0,
+            category: category,
+            imageUrl: image,
+            isAvailable: false, // hidden until owner sets price
+          ),
+        );
+        added++;
+      }
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Added $added items. Tap item to quick edit price, then turn ON.'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: accent,
+      ),
+    );
+  }
 }
 
 class _SwipeableProductShell extends StatelessWidget {
@@ -677,6 +1127,7 @@ class _SwipeableProductShell extends StatelessWidget {
     required this.slidableKey,
     required this.bizColor,
     required this.onEdit,
+    required this.onDuplicate,
     required this.onDelete,
     required this.child,
   });
@@ -684,6 +1135,7 @@ class _SwipeableProductShell extends StatelessWidget {
   final Key slidableKey;
   final Color bizColor;
   final VoidCallback onEdit;
+  final VoidCallback onDuplicate;
   final VoidCallback onDelete;
   final Widget child;
 
@@ -694,7 +1146,7 @@ class _SwipeableProductShell extends StatelessWidget {
       closeOnScroll: true,
       endActionPane: ActionPane(
         motion: const ScrollMotion(),
-        extentRatio: 0.30,
+        extentRatio: 0.45,
         children: [
           CustomSlidableAction(
             onPressed: (_) => onEdit(),
@@ -711,6 +1163,28 @@ class _SwipeableProductShell extends StatelessWidget {
                   height: 42,
                   child: Icon(
                     Icons.edit_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          CustomSlidableAction(
+            onPressed: (_) => onDuplicate(),
+            backgroundColor: Colors.transparent,
+            padding: const EdgeInsets.only(left: 4, right: 4),
+            child: Center(
+              child: Material(
+                color: const Color(0xFF1A3A5C),
+                elevation: 2,
+                shadowColor: Colors.black26,
+                borderRadius: BorderRadius.circular(14),
+                child: const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: Icon(
+                    Icons.copy_rounded,
                     color: Colors.white,
                     size: 20,
                   ),
@@ -754,12 +1228,14 @@ class _ProductCard extends StatelessWidget {
   final String bizId;
   final Color bizColor;
   final VoidCallback onToggle;
+  final VoidCallback onQuickEdit;
 
   const _ProductCard({
     required this.product,
     required this.bizId,
     required this.bizColor,
     required this.onToggle,
+    required this.onQuickEdit,
   });
 
   bool get _isService => ['salon', 'gym', 'clinic'].contains(bizId);
@@ -781,10 +1257,13 @@ class _ProductCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
+      child: InkWell(
+        onTap: onQuickEdit,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
             // ── Image / icon ─────────────────────────────────────────
             Stack(
               children: [
@@ -988,20 +1467,32 @@ class _ProductCard extends StatelessWidget {
             ),
 
             // ── Controls ─────────────────────────────────────────────
-            SizedBox(
-              height: 26,
-              width: 46,
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: Switch(
-                  value: product.isAvailable,
-                  onChanged: (_) => onToggle(),
-                  activeThumbColor: bizColor,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 26,
+                  width: 46,
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: Switch(
+                      value: product.isAvailable,
+                      onChanged: (_) => onToggle(),
+                      activeThumbColor: bizColor,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                const Icon(
+                  Icons.swipe_left_rounded,
+                  size: 18,
+                  color: AppColors.textHint,
+                ),
+              ],
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

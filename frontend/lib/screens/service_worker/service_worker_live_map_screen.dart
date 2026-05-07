@@ -6,6 +6,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/api/location_api.dart';
+import '../../core/config/offline_mode.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/service_provider_profile.dart';
 import '../../providers/service_provider_directory_provider.dart';
@@ -43,6 +46,7 @@ class _ServiceWorkerLiveMapScreenState extends State<ServiceWorkerLiveMapScreen>
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
+        if (!mounted) return;
         setState(() => _error = 'Location services OFF hain');
         return;
       }
@@ -52,13 +56,17 @@ class _ServiceWorkerLiveMapScreenState extends State<ServiceWorkerLiveMapScreen>
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.denied) {
+        if (!mounted) return;
         setState(() => _error = 'Location permission denied');
         return;
       }
       if (perm == LocationPermission.deniedForever) {
+        if (!mounted) return;
         setState(() => _error = 'Location permission permanently denied');
         return;
       }
+
+      if (!mounted) return;
 
       final settings = const LocationSettings(
         accuracy: LocationAccuracy.best,
@@ -70,6 +78,7 @@ class _ServiceWorkerLiveMapScreenState extends State<ServiceWorkerLiveMapScreen>
         (p) async {
           final next = LatLng(p.latitude, p.longitude);
           if (!mounted) return;
+          final directory = context.read<ServiceProviderDirectoryProvider>();
           setState(() {
             _pos = next;
             _error = null;
@@ -77,13 +86,14 @@ class _ServiceWorkerLiveMapScreenState extends State<ServiceWorkerLiveMapScreen>
 
           // Smoothly follow.
           await _map?.animateCamera(CameraUpdate.newLatLng(next));
+          if (!mounted) return;
 
           // Persist to local directory so customer "Near Me" updates.
           final prefs = await SharedPreferences.getInstance();
           final providerId = (prefs.getString('active_provider_id') ?? '').trim();
           if (providerId.isEmpty) return;
+          if (!mounted) return;
 
-          final directory = context.read<ServiceProviderDirectoryProvider>();
           final current = directory.providers
               .where((x) => x.id == providerId)
               .cast<ServiceProviderProfile?>()
@@ -105,8 +115,17 @@ class _ServiceWorkerLiveMapScreenState extends State<ServiceWorkerLiveMapScreen>
               lng: p.longitude,
               updatedAt: DateTime.now(),
               createdAt: current.createdAt,
+              scrapRatesDisplay: current.scrapRatesDisplay,
             ),
           );
+          if (!OfflineMode.enabled) {
+            try {
+              await LocationApi(ApiClient()).postServiceProviderLocation(
+                lat: p.latitude,
+                lng: p.longitude,
+              );
+            } catch (_) {}
+          }
         },
         onError: (e) {
           if (!mounted) return;

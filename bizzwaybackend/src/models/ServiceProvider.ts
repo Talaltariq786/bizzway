@@ -15,6 +15,8 @@ const ServiceProviderSchema = new Schema(
     nic: { type: String },
     imageUrl: { type: String },
     planId: { type: String },
+    /** Kabari / scrap buyer — material label → rate line shown on Near Me (PKR). */
+    scrapRatesDisplay: { type: Map, of: String },
     online: { type: Boolean, default: false, index: true },
     location: { type: PointSchema },
     lastSeenAt: { type: Date },

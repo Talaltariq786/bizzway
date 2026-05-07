@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/config/offline_mode.dart';
+import '../../core/demo/investor_demo_fixtures.dart';
+import '../../core/demo/presenter_mode.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/utils/app_toast.dart';
 import '../../core/utils/async_guard.dart';
@@ -43,6 +46,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       );
       if (!mounted) return;
       if (ok) {
+        await auth.persistLoginTabIntent(loginTab: UserType.customer);
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, AppRoutes.customerHome);
       } else {
         showAppSnackBar(
@@ -206,6 +211,15 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
   bool _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<RiderTeamProvider>().ensurePlaybackTeamRiderIfNeeded();
+    });
+  }
+
+  @override
   void dispose() {
     _phoneCtrl.dispose();
     _riderIdCtrl.dispose();
@@ -219,6 +233,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     try {
       final auth = context.read<AuthProvider>();
       final team = context.read<RiderTeamProvider>();
+      await team.ensurePlaybackTeamRiderIfNeeded();
       await team.ensureLoaded();
       final hit = team.findTeamRiderForLogin(
         _riderIdCtrl.text.trim(),
@@ -254,9 +269,15 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final demoLine = OfflineMode.enabled || PresenterMode.enabled
+        ? ' Offline / guided tour demo: ID $kInvestorDemoTeamRiderId · '
+            '$kInvestorDemoTeamRiderPhone (same device par auto-fill hota hai).'
+        : '';
     return _RoleLoginScaffold(
       title: 'Rider Login',
-      subtitle: 'Team rider (store-assigned) — Rider ID + phone',
+      subtitle:
+          'Team rider login — wahi Rider ID + jo shop owner ne "Meray riders" mein di hai '
+          '(business owner alag ID banata hai; aap wahi ID + phone daalte ho).$demoLine',
       child: Form(
         key: _formKey,
         child: Column(
@@ -285,8 +306,8 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Owner app me Profile → Meray riders se aap ka ID + phone add hota hai. '
-              'Wohi yahan enter karein.',
+              'Profile side menu → Meray riders: owner naya Rider ID, naam, phone set karta hai. '
+              'Rider app me yahan wohi ID + phone — team rider flow (alag signup nahi).',
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.35,
@@ -335,7 +356,13 @@ class _HomeServicesLoginScreenState extends State<HomeServicesLoginScreen> {
       if (!mounted) return;
       if (ok) {
         final u = context.read<AuthProvider>();
-        if (u.userType == UserType.rider) {
+        await auth.persistLoginTabIntent(
+          loginTab: UserType.serviceWorker,
+          serviceBranchHome: u.userType != UserType.rider,
+        );
+        if (!mounted) return;
+        final u2 = context.read<AuthProvider>();
+        if (u2.userType == UserType.rider) {
           Navigator.pushReplacementNamed(context, AppRoutes.riderHome);
         } else {
           Navigator.pushReplacementNamed(context, AppRoutes.serviceWorkerHome);

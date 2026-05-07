@@ -33,7 +33,13 @@ import '../../core/constants/dashboard_header_layout.dart';
 enum _SalesRange { daily, weekly, monthly, yearly }
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  /// Investor demo: opens the sliding drawer so "Meray riders" is visible in the side menu.
+  final bool investorDemoAutoOpenDrawer;
+
+  const DashboardScreen({
+    super.key,
+    this.investorDemoAutoOpenDrawer = false,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -88,6 +94,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       await context.read<OrderProvider>().refreshFromApi();
     });
+    if (widget.investorDemoAutoOpenDrawer) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        if (!mounted) return;
+        _drawerKey.currentState?.openDrawer();
+      });
+    }
   }
 
   @override

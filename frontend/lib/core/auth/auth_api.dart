@@ -19,9 +19,14 @@ class AuthUserDto {
 
   static AuthUserDto fromJson(Map<String, dynamic> json) {
     final rolesRaw = json['roles'];
-    final roles = rolesRaw is List
+    var roles = rolesRaw is List
         ? rolesRaw.map((e) => e.toString()).toList()
         : <String>[];
+    // Some payloads use singular `role` only.
+    if (roles.isEmpty) {
+      final one = json['role']?.toString().trim();
+      if (one != null && one.isNotEmpty) roles = [one];
+    }
     return AuthUserDto(
       id: (json['id'] ?? '').toString(),
       roles: roles,
@@ -43,14 +48,14 @@ class AuthApi {
     String? email,
     required String password,
     required String role,
-    String? name,
+    required String name,
   }) async {
     final body = <String, dynamic>{
       'password': password,
       'role': role,
+      'name': name.trim(),
       if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
       if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
-      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
     };
     final res = await _api.postJson(ApiPaths.authRegister, body: body);
     return _parseAuthPayload(res);

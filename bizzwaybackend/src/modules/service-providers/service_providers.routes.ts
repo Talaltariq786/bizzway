@@ -6,6 +6,14 @@ import { requireRoles } from '../../middlewares/roles.js';
 import { ServiceProviderModel } from '../../models/ServiceProvider.js';
 import { UpsertServiceProviderProfileSchema } from './service_providers.schemas.js';
 
+function scrapRatesToJson(doc: { scrapRatesDisplay?: unknown } | null): Record<string, string> {
+  const m = doc?.scrapRatesDisplay as unknown;
+  if (!m) return {};
+  if (m instanceof Map) return Object.fromEntries(m as Map<string, string>);
+  if (typeof m === 'object') return { ...(m as Record<string, string>) };
+  return {};
+}
+
 export function serviceProvidersRouter(env: Env) {
   const r = Router();
 
@@ -22,6 +30,7 @@ export function serviceProvidersRouter(env: Env) {
             online: doc.online ?? false,
             location: doc.location ?? null,
             lastSeenAt: doc.lastSeenAt ?? null,
+            scrapRatesDisplay: scrapRatesToJson(doc),
           }
         : null,
     });
@@ -30,18 +39,19 @@ export function serviceProvidersRouter(env: Env) {
   r.put('/service-providers/me', requireAuth(env), requireRoles('serviceWorker', 'admin'), async (req, res, next) => {
     try {
       const body = UpsertServiceProviderProfileSchema.parse(req.body);
-      await ServiceProviderModel.updateOne(
-        { userId: req.auth!.sub },
-        {
-          $set: {
-            profession: body.profession,
-            nic: body.nic,
-            imageUrl: body.imageUrl,
-            planId: body.planId ?? 'monthly',
-          },
-        },
-        { upsert: true },
-      );
+      const $set: Record<string, unknown> = {
+        profession: body.profession,
+        planId: body.planId ?? 'monthly',
+      };
+      if (body.nic !== undefined) $set.nic = body.nic;
+      if (body.imageUrl !== undefined) $set.imageUrl = body.imageUrl;
+      if (body.scrapRatesDisplay !== undefined) {
+        $set.scrapRatesDisplay =
+          body.scrapRatesDisplay && Object.keys(body.scrapRatesDisplay).length > 0
+            ? new Map(Object.entries(body.scrapRatesDisplay))
+            : new Map();
+      }
+      await ServiceProviderModel.updateOne({ userId: req.auth!.sub }, { $set }, { upsert: true });
       const doc = await ServiceProviderModel.findOne({ userId: req.auth!.sub });
       return res.json({
         ok: true,
@@ -52,6 +62,8 @@ export function serviceProvidersRouter(env: Env) {
               nic: doc.nic ?? null,
               imageUrl: doc.imageUrl ?? null,
               planId: doc.planId ?? null,
+              online: doc.online ?? false,
+              scrapRatesDisplay: scrapRatesToJson(doc),
             }
           : null,
       });

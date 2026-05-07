@@ -53,6 +53,7 @@ class BookSlotScreen extends StatelessWidget {
 
             final booking = vm.buildBooking();
             await context.read<AppointmentProvider>().createBooking(booking);
+            if (!context.mounted) return;
 
             await showDialog(
               context: context,

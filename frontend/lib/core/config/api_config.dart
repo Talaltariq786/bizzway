@@ -5,6 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Backend base URL used by [ApiClient].
 ///
+/// **Production / live:** build with
+/// `--dart-define=API_BASE_URL=https://api.yourdomain.com` (no trailing `/`)
+/// and `--dart-define=OFFLINE_MODE=false`. Same URL can be set in-app via login **API:** row.
+///
 /// Priority: `API_BASE_URL` (dart-define) → saved **dev URL** (in-app) →
 /// `API_DEV_HOST` → platform default.
 ///

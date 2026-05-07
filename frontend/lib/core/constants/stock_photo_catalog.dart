@@ -3,7 +3,7 @@
 ///
 /// Labels are Pakistan-style menu / general-store wording. Brand names are descriptive
 /// (“popular brand style”) without using trademark logos as images.
-library stock_photo_catalog;
+library;
 
 abstract final class StockPhotoCatalog {
   StockPhotoCatalog._();
@@ -149,7 +149,121 @@ abstract final class StockPhotoCatalog {
         'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&w=800&q=82',
     'car_luxury':
         'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=82',
+    // Salon & beauty
+    'salon1':
+        'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=82',
+    'salon2':
+        'https://images.unsplash.com/photo-1503951914875-452162b0e3a1?auto=format&fit=crop&w=800&q=82',
+    'facial1':
+        'https://images.unsplash.com/photo-1512290923902-8a9b81a236a8?auto=format&fit=crop&w=800&q=82',
+    'nail1':
+        'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=800&q=82',
+    'makeup1':
+        'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?auto=format&fit=crop&w=800&q=82',
+    'wax1':
+        'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=800&q=82',
+    // Gym & fitness
+    'gym1':
+        'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=82',
+    'gym2':
+        'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=800&q=82',
+    'gym3':
+        'https://images.unsplash.com/photo-1599058945522-23772669bccc?auto=format&fit=crop&w=800&q=82',
+    // Clinic / health (generic, no brand logos)
+    'doc1':
+        'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=800&q=82',
+    'lab1':
+        'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=82',
+    'pills1':
+        'https://images.unsplash.com/photo-1584308666744-24d5c474e2ff?auto=format&fit=crop&w=800&q=82',
+    // Mechanic
+    'tire1':
+        'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=82',
+    'battery1':
+        'https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&w=800&q=82',
+    'wrench1':
+        'https://images.unsplash.com/photo-1504222490343-c4fcc94dba60?auto=format&fit=crop&w=800&q=82',
+    'tow1':
+        'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=82',
+    // Home services
+    'home_electric':
+        'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=800&q=82',
+    'home_plumber':
+        'https://images.unsplash.com/photo-1581244277943-cbf7bbaaf9ac?auto=format&fit=crop&w=800&q=82',
+    'home_wood':
+        'https://images.unsplash.com/photo-1504148455328-c376907d481c?auto=format&fit=crop&w=800&q=82',
+    'home_paint':
+        'https://images.unsplash.com/photo-1561214115f19b0fa6a90a202584c6a?auto=format&fit=crop&w=800&q=82',
+    'home_ac':
+        'https://images.unsplash.com/photo-1631545285857-e0f50d49f255?auto=format&fit=crop&w=800&q=82',
   };
+
+  /// Business cover photo suggestions (HD) for Pakistani-style food/grocery.
+  ///
+  /// Returns **HTTPS URLs** sized for header/cover usage (w=1600).
+  static List<String> coverSuggestionsForBusiness(String businessTypeId) {
+    final b = businessTypeId.toLowerCase().trim();
+    final keys = <String>[
+      if (b == 'restaurant' || b == 'cafe') ...[
+        'biryani1',
+        'thali1',
+        'curry1',
+        'bbq1',
+        'wrap1',
+        'lassi1',
+      ] else if (b == 'grocery' || b == 'pharmacy' || b == 'others') ...[
+        'pk_spice_market',
+        'veg1',
+        'pk_drinks_shelf',
+        'pk_milk_shelf',
+        'pk_masala_bags',
+      ] else if (b == 'rentacar') ...[
+        'car_sedan',
+        'car_suv',
+        'car_hatch',
+      ] else if (b == 'salon' || b == 'beauty') ...[
+        'salon1',
+        'facial1',
+        'nail1',
+        'makeup1',
+      ] else if (b == 'gym') ...[
+        'gym1',
+        'gym2',
+        'gym3',
+      ] else if (b == 'clinic') ...[
+        'doc1',
+        'lab1',
+        'pills1',
+      ] else if (b == 'mechanic') ...[
+        'tire1',
+        'battery1',
+        'wrench1',
+      ] else if (b == 'homeservice') ...[
+        'home_electric',
+        'home_plumber',
+        'home_paint',
+        'home_ac',
+      ] else ...[
+        // Fallback: still pleasant, non-offensive, general covers.
+        'thali1',
+        'pk_spice_market',
+        'car_sedan',
+      ],
+    ];
+
+    return keys
+        .map((k) => _u[k])
+        .whereType<String>()
+        .map(_toCoverHd)
+        .toSet()
+        .toList();
+  }
+
+  static String _toCoverHd(String url) {
+    // Unsplash URLs in this catalog already include `w=800`. For cover headers,
+    // we bump width to 1600 for a sharper look.
+    return url.replaceAll(RegExp(r'([?&])w=\d+'), r'$1w=1600');
+  }
 
   /// Normalized label → Unsplash-backed URL for **restaurant / cafe** library items.
   static final Map<String, String> _restaurant = () {
@@ -264,6 +378,17 @@ abstract final class StockPhotoCatalog {
     a('Beef Karahi', 'curry1');
     a('Reshmi Kabab', 'bbq2');
     a('Sada Chawal', 'rice1');
+    a('White Chicken Karahi', 'curry2');
+    a('Seekh Pizza', 'pizza1');
+    a('Anda Paratha Roll', 'wrap2');
+    a('Cheeni Paratha Roll', 'wrap2');
+    a('Mayo Roll', 'wrap1');
+    a('Cola (1.5L)', 'drink1');
+    a('Sprite (500ml)', 'drink1');
+    a('Chicken Boti', 'bbq1');
+    a('Beef Seekh Kabab', 'bbq1');
+    a('Beef Korma', 'curry2');
+    a('Achari Roll', 'wrap1');
 
     return m;
   }();
@@ -405,6 +530,99 @@ abstract final class StockPhotoCatalog {
     return m;
   }();
 
+  static final Map<String, String> _salon = () {
+    final m = <String, String>{};
+    void a(String label, String key) {
+      m[_norm(label)] = _u[key]!;
+    }
+    a('Haircut', 'salon1');
+    a('Hair Styling', 'salon1');
+    a('Beard Trim', 'salon2');
+    a('Shave', 'salon2');
+    a('Facial', 'facial1');
+    a('Cleanup', 'facial1');
+    a('Wax', 'wax1');
+    a('Threading', 'facial1');
+    a('Mani/Pedi', 'nail1');
+    a('Manicure', 'nail1');
+    a('Pedicure', 'nail1');
+    a('Party Makeup', 'makeup1');
+    a('Bridal Makeup', 'makeup1');
+    a('Makeup', 'makeup1');
+    return m;
+  }();
+
+  static final Map<String, String> _gym = () {
+    final m = <String, String>{};
+    void a(String label, String key) {
+      m[_norm(label)] = _u[key]!;
+    }
+    a('Membership', 'gym1');
+    a('Monthly Membership', 'gym1');
+    a('Yearly Membership', 'gym1');
+    a('Personal Training', 'gym2');
+    a('PT Session', 'gym2');
+    a('Class', 'gym3');
+    a('Group Class', 'gym3');
+    a('Diet Plan', 'gym2');
+    return m;
+  }();
+
+  static final Map<String, String> _clinic = () {
+    final m = <String, String>{};
+    void a(String label, String key) {
+      m[_norm(label)] = _u[key]!;
+    }
+    a('Consultation', 'doc1');
+    a('OPD Consult', 'doc1');
+    a('Video Consult', 'doc1');
+    a('Lab', 'lab1');
+    a('Blood Test', 'lab1');
+    a('X-Ray', 'lab1');
+    a('Medicines', 'pills1');
+    a('Prescription Medicines', 'pills1');
+    return m;
+  }();
+
+  static final Map<String, String> _mechanic = () {
+    final m = <String, String>{};
+    void a(String label, String key) {
+      m[_norm(label)] = _u[key]!;
+    }
+    a('Puncture', 'tire1');
+    a('Tire Repair', 'tire1');
+    a('Puncture Fix', 'tire1');
+    a('Battery', 'battery1');
+    a('Battery Change', 'battery1');
+    a('Jump Start', 'battery1');
+    a('Oil Change', 'wrench1');
+    a('Filter Change', 'wrench1');
+    a('Towing', 'tow1');
+    a('Roadside Help', 'tow1');
+    return m;
+  }();
+
+  static final Map<String, String> _homeService = () {
+    final m = <String, String>{};
+    void a(String label, String key) {
+      m[_norm(label)] = _u[key]!;
+    }
+    a('Electrician', 'home_electric');
+    a('Wiring', 'home_electric');
+    a('Fan Install', 'home_electric');
+    a('Plumber', 'home_plumber');
+    a('Leak Fix', 'home_plumber');
+    a('Motor Install', 'home_plumber');
+    a('Carpenter', 'home_wood');
+    a('Furniture Repair', 'home_wood');
+    a('Painter', 'home_paint');
+    a('Room Paint', 'home_paint');
+    a('AC', 'home_ac');
+    a('AC Service', 'home_ac');
+    a('Gas Refill', 'home_ac');
+    return m;
+  }();
+
   static String _norm(String s) =>
       s.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
 
@@ -432,7 +650,113 @@ abstract final class StockPhotoCatalog {
     if (b == 'rentacar') {
       return rentacarUrlForLabel(label);
     }
+    if (b == 'salon' || b == 'beauty') {
+      return salonUrlForLabel(label);
+    }
+    if (b == 'gym') {
+      return gymUrlForLabel(label);
+    }
+    if (b == 'clinic') {
+      return clinicUrlForLabel(label);
+    }
+    if (b == 'mechanic') {
+      return mechanicUrlForLabel(label);
+    }
+    if (b == 'homeservice') {
+      return homeServiceUrlForLabel(label);
+    }
     return null;
+  }
+
+  static String? salonUrlForLabel(String label) {
+    final k = _norm(label);
+    return _salon[k] ?? _salonPartial(k);
+  }
+
+  static String? gymUrlForLabel(String label) {
+    final k = _norm(label);
+    return _gym[k] ?? _gymPartial(k);
+  }
+
+  static String? clinicUrlForLabel(String label) {
+    final k = _norm(label);
+    return _clinic[k] ?? _clinicPartial(k);
+  }
+
+  static String? mechanicUrlForLabel(String label) {
+    final k = _norm(label);
+    return _mechanic[k] ?? _mechanicPartial(k);
+  }
+
+  static String? homeServiceUrlForLabel(String label) {
+    final k = _norm(label);
+    return _homeService[k] ?? _homeServicePartial(k);
+  }
+
+  static String? _salonPartial(String k) {
+    if (k.contains('hair') || k.contains('style')) return _u['salon1'];
+    if (k.contains('beard') || k.contains('shave')) return _u['salon2'];
+    if (k.contains('facial') || k.contains('clean')) return _u['facial1'];
+    if (k.contains('wax') || k.contains('thread')) return _u['wax1'];
+    if (k.contains('mani') || k.contains('pedi') || k.contains('nail')) {
+      return _u['nail1'];
+    }
+    if (k.contains('makeup') || k.contains('bridal') || k.contains('party')) {
+      return _u['makeup1'];
+    }
+    return _u['salon1'];
+  }
+
+  static String? _gymPartial(String k) {
+    if (k.contains('diet') || k.contains('nutrition')) return _u['gym2'];
+    if (k.contains('yoga') || k.contains('class') || k.contains('group')) {
+      return _u['gym3'];
+    }
+    if (k.contains('pt') || k.contains('personal')) return _u['gym2'];
+    if (k.contains('member')) return _u['gym1'];
+    return _u['gym1'];
+  }
+
+  static String? _clinicPartial(String k) {
+    if (k.contains('blood') || k.contains('x-ray') || k.contains('lab')) {
+      return _u['lab1'];
+    }
+    if (k.contains('medicine') || k.contains('pharma') || k.contains('drug')) {
+      return _u['pills1'];
+    }
+    if (k.contains('consult') || k.contains('opd') || k.contains('doctor')) {
+      return _u['doc1'];
+    }
+    return _u['doc1'];
+  }
+
+  static String? _mechanicPartial(String k) {
+    if (k.contains('tire') || k.contains('punctur') || k.contains('wheel')) {
+      return _u['tire1'];
+    }
+    if (k.contains('battery') || k.contains('jump')) return _u['battery1'];
+    if (k.contains('oil') || k.contains('filter') || k.contains('wrench')) {
+      return _u['wrench1'];
+    }
+    if (k.contains('tow') || k.contains('road')) return _u['tow1'];
+    return _u['wrench1'];
+  }
+
+  static String? _homeServicePartial(String k) {
+    if (k.contains('electric') || k.contains('wire') || k.contains('fan')) {
+      return _u['home_electric'];
+    }
+    if (k.contains('plumb') || k.contains('leak') || k.contains('motor')) {
+      return _u['home_plumber'];
+    }
+    if (k.contains('carpent') || k.contains('wood') || k.contains('furniture')) {
+      return _u['home_wood'];
+    }
+    if (k.contains('paint')) return _u['home_paint'];
+    if (k.contains('gas refill') || k.contains('ac service') || k == 'ac') {
+      return _u['home_ac'];
+    }
+    return _u['home_electric'];
   }
 
   /// Generic car imagery for rent-a-car library (no manufacturer logos).

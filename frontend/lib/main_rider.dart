@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'apps/rider_app.dart';
+import 'core/config/api_config.dart';
+import 'core/demo/presenter_mode.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ApiConfig.initFromPrefs();
+  await PresenterMode.initFromPrefs();
   FlutterError.onError = (details) {
     if (details.exceptionAsString().contains('_pressedKeys.containsKey')) return;
     FlutterError.presentError(details);

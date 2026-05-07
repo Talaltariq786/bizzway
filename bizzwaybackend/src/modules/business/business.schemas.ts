@@ -19,3 +19,8 @@ export const CreateProductSchema = z.object({
 
 export const PatchProductSchema = CreateProductSchema.partial();
 
+export const PatchBusinessSchema = z.object({
+  shopManuallyClosed: z.boolean().optional(),
+  shopClosedReason: z.string().max(500).optional(),
+});
+

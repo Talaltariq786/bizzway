@@ -21,6 +21,8 @@ class AuthProvider extends ChangeNotifier {
   String? _serviceProfession;
   String? _serviceNic;
   String? _serviceImagePath;
+  String? _serviceNicFrontImagePath;
+  String? _serviceNicBackImagePath;
   String? _servicePlan;
   String? _riderLicense;
   String? _riderBike;
@@ -38,6 +40,10 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   UserType _userType = UserType.businessOwner;
 
+  // ── Login tab intent (phone flows): which UI the user chose on Login screen.
+  /// Overrides JWT `roles` for routing so Service tab → service worker UI even if DB still has `customer`.
+  static const String _kLoginTabIntentKey = 'bizzway_login_tab_intent';
+
   // ── Team rider (owner-assigned) session ────────────────────────────────────
   String? _teamRiderId;
   String? _teamRiderBusinessId;
@@ -48,6 +54,8 @@ class AuthProvider extends ChangeNotifier {
   String? get serviceProfession => _serviceProfession;
   String? get serviceNic => _serviceNic;
   String? get serviceImagePath => _serviceImagePath;
+  String? get serviceNicFrontImagePath => _serviceNicFrontImagePath;
+  String? get serviceNicBackImagePath => _serviceNicBackImagePath;
   String? get servicePlan => _servicePlan;
   String? get riderLicense => _riderLicense;
   String? get riderBike => _riderBike;
@@ -83,12 +91,36 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Maps backend role strings to [UserType]. Accepts common aliases / casing.
   UserType _userTypeFromRoles(List<String> roles) {
-    if (roles.contains('businessOwner')) return UserType.businessOwner;
-    if (roles.contains('rider')) return UserType.rider;
-    if (roles.contains('serviceWorker')) return UserType.serviceWorker;
-    if (roles.contains('customer')) return UserType.customer;
+    bool has(String canonical) {
+      for (final r in roles) {
+        if (_canonicalRole(r) == canonical) return true;
+      }
+      return false;
+    }
+
+    if (has('businessOwner')) return UserType.businessOwner;
+    if (has('rider')) return UserType.rider;
+    if (has('serviceWorker')) return UserType.serviceWorker;
+    if (has('customer')) return UserType.customer;
     return UserType.customer;
+  }
+
+  /// Normalizes e.g. `service_worker`, `ServiceWorker`, `serviceProvider` → camelCase keys we compare.
+  String _canonicalRole(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return '';
+    final lower = t.toLowerCase().replaceAll(RegExp(r'[\s_-]'), '');
+    return switch (lower) {
+      'businessowner' => 'businessOwner',
+      'serviceworker' => 'serviceWorker',
+      'serviceprovider' => 'serviceWorker',
+      'customer' => 'customer',
+      'rider' => 'rider',
+      'admin' => 'admin',
+      _ => t,
+    };
   }
 
   String _prefsKeyForUserType(UserType t) {
@@ -100,6 +132,22 @@ class AuthProvider extends ChangeNotifier {
     };
   }
 
+  void _applyLoginTabIntentIfPresent(SharedPreferences prefs) {
+    final intent = prefs.getString(_kLoginTabIntentKey);
+    if (intent == null) return;
+    switch (intent) {
+      case 'customer':
+        _userType = UserType.customer;
+        break;
+      case 'serviceWorker':
+        _userType = UserType.serviceWorker;
+        break;
+      case 'rider':
+        _userType = UserType.rider;
+        break;
+    }
+  }
+
   Future<void> _applyUserDto(AuthUserDto me) async {
     final prefs = await SharedPreferences.getInstance();
     final display = me.phone ?? me.email ?? '';
@@ -108,8 +156,38 @@ class AuthProvider extends ChangeNotifier {
       await prefs.setString('user_email', _userEmail!);
     }
     _userType = _userTypeFromRoles(me.roles);
+    _applyLoginTabIntentIfPresent(prefs);
     await prefs.setString('user_type', _prefsKeyForUserType(_userType));
+    if (_userType == UserType.serviceWorker) {
+      await prefs.setString('active_provider_id', _userEmail ?? '');
+      await ProviderBackgroundLocation.setEnabled(_onlineForWork);
+    }
     _status = AuthStatus.authenticated;
+  }
+
+  /// Call after successful login / sign-up from the Login UI so [userType] matches the tab user picked.
+  Future<void> persistLoginTabIntent({
+    required UserType loginTab,
+    bool serviceBranchHome = true,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (loginTab == UserType.businessOwner) {
+      await prefs.remove(_kLoginTabIntentKey);
+    } else if (loginTab == UserType.customer) {
+      await prefs.setString(_kLoginTabIntentKey, 'customer');
+    } else if (loginTab == UserType.serviceWorker) {
+      await prefs.setString(
+        _kLoginTabIntentKey,
+        serviceBranchHome ? 'serviceWorker' : 'rider',
+      );
+    }
+    _applyLoginTabIntentIfPresent(prefs);
+    await prefs.setString('user_type', _prefsKeyForUserType(_userType));
+    if (_userType == UserType.serviceWorker) {
+      await prefs.setString('active_provider_id', _userEmail ?? '');
+      await ProviderBackgroundLocation.setEnabled(_onlineForWork);
+    }
+    notifyListeners();
   }
 
   Future<void> _persistSessionFromAuthResponse(
@@ -130,6 +208,8 @@ class AuthProvider extends ChangeNotifier {
     _serviceProfession = prefs.getString('service_profession');
     _serviceNic = prefs.getString('service_nic');
     _serviceImagePath = prefs.getString('service_image_path');
+    _serviceNicFrontImagePath = prefs.getString('service_nic_front_image_path');
+    _serviceNicBackImagePath = prefs.getString('service_nic_back_image_path');
     _servicePlan = prefs.getString('service_plan');
     _riderLicense = prefs.getString('rider_license');
     _riderBike = prefs.getString('rider_bike');
@@ -222,10 +302,6 @@ class AuthProvider extends ChangeNotifier {
         }
       }
       _hydrateLocalProfileFields(prefs, applyUserTypeFromPrefs: false);
-      if (_userType == UserType.serviceWorker) {
-        await prefs.setString('active_provider_id', _userEmail ?? '');
-        await ProviderBackgroundLocation.setEnabled(_onlineForWork);
-      }
       notifyListeners();
     } on ApiException catch (e) {
       // Server off / no network: `statusCode` is null. Don't wipe the session.
@@ -369,6 +445,7 @@ class AuthProvider extends ChangeNotifier {
 
     await AuthTokenStorage.instance.clear();
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kLoginTabIntentKey);
     await prefs.setString('user_email', p);
     await prefs.setString('user_type', 'rider');
     await prefs.setString('team_rider_id', id);
@@ -423,16 +500,22 @@ class AuthProvider extends ChangeNotifier {
     required String profession,
     required String nic,
     required String imagePath,
+    required String nicFrontImagePath,
+    required String nicBackImagePath,
     required String plan,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     _serviceProfession = profession;
     _serviceNic = nic;
     _serviceImagePath = imagePath;
+    _serviceNicFrontImagePath = nicFrontImagePath;
+    _serviceNicBackImagePath = nicBackImagePath;
     _servicePlan = plan;
     await prefs.setString('service_profession', profession);
     await prefs.setString('service_nic', nic);
     await prefs.setString('service_image_path', imagePath);
+    await prefs.setString('service_nic_front_image_path', nicFrontImagePath);
+    await prefs.setString('service_nic_back_image_path', nicBackImagePath);
     await prefs.setString('service_plan', plan);
     notifyListeners();
   }
@@ -503,12 +586,19 @@ class AuthProvider extends ChangeNotifier {
     if (password.length < 6) {
       return false;
     }
+    final nm = (name ?? '').trim();
+    if (nm.length < 2) {
+      return false;
+    }
     final trimmed = identifier.trim();
     final isPhoneRole = userType == UserType.customer ||
         userType == UserType.serviceWorker ||
         userType == UserType.rider;
-    if (isPhoneRole && trimmed.length < 10) {
-      return false;
+    if (isPhoneRole) {
+      final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+      if (digits.length < 10 || digits.length > 15) {
+        return false;
+      }
     }
     if (!isPhoneRole && trimmed.isEmpty) {
       return false;
@@ -528,13 +618,12 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final nm = name?.trim();
       final session = await _authApi.register(
         phone: isPhoneRole ? trimmed : null,
         email: isPhoneRole ? null : trimmed,
         password: password,
         role: _apiRoleForSignUp(userType),
-        name: (nm == null || nm.isEmpty) ? null : nm,
+        name: nm,
       );
       await _persistSessionFromAuthResponse(session);
       final prefs = await SharedPreferences.getInstance();
@@ -543,6 +632,10 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiException {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    } catch (_) {
       _isLoading = false;
       notifyListeners();
       rethrow;
@@ -560,6 +653,8 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('service_profession');
     await prefs.remove('service_nic');
     await prefs.remove('service_image_path');
+    await prefs.remove('service_nic_front_image_path');
+    await prefs.remove('service_nic_back_image_path');
     await prefs.remove('service_plan');
     await prefs.remove('rider_license');
     await prefs.remove('rider_bike');
@@ -572,10 +667,13 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('rider_hub_lng');
     await prefs.remove('worker_online_for_work');
     await prefs.remove('remote_business_mongo_id');
+    await prefs.remove(_kLoginTabIntentKey);
     _userEmail = null;
     _serviceProfession = null;
     _serviceNic = null;
     _serviceImagePath = null;
+    _serviceNicFrontImagePath = null;
+    _serviceNicBackImagePath = null;
     _servicePlan = null;
     _riderLicense = null;
     _riderBike = null;

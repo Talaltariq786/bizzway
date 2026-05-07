@@ -48,8 +48,8 @@ Future<void> showAppLoader(BuildContext context, {String? message}) async {
     context: context,
     barrierDismissible: false,
     barrierColor: Colors.black.withValues(alpha: 0.2),
-    builder: (_) => WillPopScope(
-      onWillPop: () async => false,
+    builder: (_) => PopScope(
+      canPop: false,
       child: Material(
         type: MaterialType.transparency,
         child: AppLoader(message: message),

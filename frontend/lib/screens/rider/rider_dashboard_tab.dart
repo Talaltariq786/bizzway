@@ -5,7 +5,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../core/constants/app_colors.dart';
+import '../../core/config/offline_mode.dart';
+import '../../core/demo/investor_demo_fixtures.dart';
+import '../../core/demo/presenter_mode.dart';
 import '../../core/utils/geo.dart';
 import '../../core/utils/rider_analytics.dart';
 import '../../models/job_request.dart';
@@ -13,6 +18,7 @@ import '../../models/order.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/rider_team_provider.dart';
 import 'rider_job_detail_screen.dart';
 import 'rider_assigned_order_detail_screen.dart';
 import 'rider_navigation.dart';
@@ -37,8 +43,16 @@ class _RiderDashboardTabState extends State<RiderDashboardTab> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final auth = context.read<AuthProvider>();
+      final team = context.read<RiderTeamProvider>();
+      final orders = context.read<OrderProvider>();
+      await team.ensurePlaybackTeamRiderIfNeeded();
       if (auth.isAuthenticated) {
-        await context.read<OrderProvider>().refreshFromApi();
+        await orders.refreshFromApi();
+      }
+      if (auth.isTeamRiderAccount &&
+          auth.teamRiderId == kInvestorDemoTeamRiderId &&
+          (OfflineMode.enabled || PresenterMode.enabled)) {
+        orders.ensureDemoAssignedOrderForTeamRider(auth.teamRiderId!);
       }
     });
   }
@@ -777,6 +791,9 @@ class _RiderDashboardTabState extends State<RiderDashboardTab> {
     );
   }
 
+  static final DateFormat _orderPlacedAtFmt =
+      DateFormat('d MMM yyyy · h:mm a');
+
   Widget _teamRiderOrderCard(
     BuildContext context,
     Order o, {
@@ -849,6 +866,15 @@ class _RiderDashboardTabState extends State<RiderDashboardTab> {
                   fontWeight: FontWeight.w900,
                   fontSize: 14,
                   color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'Placed · ${_orderPlacedAtFmt.format(o.createdAt)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textHint,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 4),

@@ -1,4 +1,5 @@
 /// Pakistan gym management — admissions, payments, in-gym store.
+library;
 
 enum GymAdmissionStatus {
   pendingPayment,

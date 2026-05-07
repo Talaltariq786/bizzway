@@ -78,17 +78,48 @@ export function locationRouter(env: Env) {
       };
     }
 
-    const list = await ServiceProviderModel.find(filter).limit(50);
-    return res.json(
-      list.map((p) => ({
+    const list = await ServiceProviderModel.find(filter)
+      .populate('userId', 'name phone')
+      .limit(50)
+      .lean();
+
+    const out = list.map((p: any) => {
+      const u = p.userId;
+      const name =
+        typeof u === 'object' && u !== null && 'name' in u
+          ? String(u.name ?? '').trim() || 'Service Provider'
+          : 'Service Provider';
+      const phone =
+        typeof u === 'object' && u !== null && 'phone' in u
+          ? String(u.phone ?? '').trim()
+          : '';
+      const coords = p.location?.coordinates as number[] | undefined;
+      const lng = coords?.[0];
+      const lat = coords?.[1];
+      const sr = p.scrapRatesDisplay;
+      let scrapRatesDisplay: Record<string, string> = {};
+      if (sr instanceof Map) scrapRatesDisplay = Object.fromEntries(sr as Map<string, string>);
+      else if (sr && typeof sr === 'object') scrapRatesDisplay = { ...sr };
+
+      return {
         id: p._id.toString(),
-        userId: p.userId.toString(),
+        userId:
+          typeof u === 'object' && u !== null && '_id' in u
+            ? String(u._id)
+            : String(p.userId),
+        name,
+        phone,
         profession: p.profession,
-        online: p.online,
+        online: !!p.online,
+        lat,
+        lng,
         location: p.location,
-        lastSeenAt: p.lastSeenAt,
-      })),
-    );
+        scrapRatesDisplay,
+        lastSeenAt: p.lastSeenAt ?? null,
+      };
+    });
+
+    return res.json(out);
   });
 
   return r;

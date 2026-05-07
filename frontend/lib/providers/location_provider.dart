@@ -4,6 +4,32 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Only const [Icons.*] — required for release `tree-shake-icons` (no dynamic IconData).
+IconData savedAddressIconFromCodePoint(int codePoint) {
+  if (codePoint == Icons.home_rounded.codePoint) return Icons.home_rounded;
+  if (codePoint == Icons.work_rounded.codePoint) return Icons.work_rounded;
+  if (codePoint == Icons.work_outline_rounded.codePoint) {
+    return Icons.work_outline_rounded;
+  }
+  if (codePoint == Icons.business_rounded.codePoint) return Icons.business_rounded;
+  if (codePoint == Icons.location_on_rounded.codePoint) {
+    return Icons.location_on_rounded;
+  }
+  if (codePoint == Icons.location_city_rounded.codePoint) {
+    return Icons.location_city_rounded;
+  }
+  if (codePoint == Icons.local_shipping_rounded.codePoint) {
+    return Icons.local_shipping_rounded;
+  }
+  if (codePoint == Icons.person_pin_rounded.codePoint) {
+    return Icons.person_pin_rounded;
+  }
+  if (codePoint == Icons.other_houses_rounded.codePoint) {
+    return Icons.other_houses_rounded;
+  }
+  return Icons.location_on_rounded;
+}
+
 // ── Saved address ─────────────────────────────────────────────────────────────
 
 class SavedAddress {
@@ -198,10 +224,9 @@ class LocationProvider extends ChangeNotifier {
                   id: (mm['id'] ?? '').toString(),
                   label: (mm['label'] ?? '').toString(),
                   address: (mm['address'] ?? '').toString(),
-                  icon: IconData(
+                  icon: savedAddressIconFromCodePoint(
                     (mm['iconCodePoint'] as num?)?.toInt() ??
                         Icons.location_on_rounded.codePoint,
-                    fontFamily: 'MaterialIcons',
                   ),
                   lat: (mm['lat'] as num?)?.toDouble(),
                   lng: (mm['lng'] as num?)?.toDouble(),

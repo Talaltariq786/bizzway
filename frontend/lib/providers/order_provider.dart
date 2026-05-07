@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_paths.dart';
 import '../core/config/offline_mode.dart';
+import '../core/demo/investor_demo_fixtures.dart';
+import '../core/demo/presenter_mode.dart';
 import '../core/utils/dev_log.dart';
 import '../models/order.dart';
 import 'job_provider.dart';
 
 class OrderProvider extends ChangeNotifier {
+  /// Keep in sync with `bizzwaybackend/src/config/order_policy.ts`.
+  static const int maxConcurrentAssignmentsPerRider = 3;
+
   final List<Order> _orders = [];
 
   List<Order> get orders => List.unmodifiable(_orders);
@@ -141,23 +146,60 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void assignRider(
+  /// Counts non-terminal orders assigned to [riderId], excluding [excludeOrderId] (for reassignment).
+  int activeAssignmentCountForRider(
+    String riderId, {
+    String? excludeOrderId,
+  }) {
+    final id = riderId.trim();
+    if (id.isEmpty) return 0;
+    return _orders.where((o) {
+      if ((o.assignedRiderId ?? '').trim() != id) return false;
+      if (excludeOrderId != null && o.id == excludeOrderId) return false;
+      return o.status != OrderStatus.completed && o.status != OrderStatus.cancelled;
+    }).length;
+  }
+
+  /// Returns `false` if rider already has [maxConcurrentAssignmentsPerRider] active orders.
+  bool assignRider(
     String orderId, {
     required String riderId,
     required String riderName,
     required String riderPhone,
   }) {
     final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index == -1) return;
+    if (index == -1) return false;
+    if (activeAssignmentCountForRider(riderId, excludeOrderId: orderId) >=
+        maxConcurrentAssignmentsPerRider) {
+      return false;
+    }
     final o = _orders[index];
     o.assignedRiderId = riderId;
     o.assignedRiderName = riderName;
     o.assignedRiderPhone = riderPhone;
     notifyListeners();
+    return true;
   }
 
   void addOrder(Order order) {
     _orders.insert(0, order);
     notifyListeners();
+  }
+
+  /// Local demo: assigned grocery order so Team rider home is non-empty (Presenter / offline).
+  void ensureDemoAssignedOrderForTeamRider(String riderId) {
+    if (riderId.trim() != kInvestorDemoTeamRiderId) return;
+    if (!OfflineMode.enabled && !PresenterMode.enabled) return;
+    const demoId = 'ORD-DEMO-RIDER-001';
+    final demo = investorDemoDeliveryOrderForAssign();
+    final i = _orders.indexWhere((o) => o.id == demoId);
+    if (i != -1) {
+      _orders[i].assignedRiderId = demo.assignedRiderId;
+      _orders[i].assignedRiderName = demo.assignedRiderName;
+      _orders[i].assignedRiderPhone = demo.assignedRiderPhone;
+      notifyListeners();
+      return;
+    }
+    addOrder(demo);
   }
 }

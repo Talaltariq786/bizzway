@@ -20,6 +20,7 @@ import 'book_slot_screen.dart';
 import '../gym/gym_online_admission_screen.dart';
 import '../../core/media/app_media.dart';
 import '../../widgets/common/app_asset_image.dart';
+import '../../core/demo/investor_demo_fixtures.dart';
 
 // ── Render mode ───────────────────────────────────────────────────────────────
 enum _Mode { food, shop, service, clinic }
@@ -221,7 +222,14 @@ IconData _serviceIcon(String cat) {
 // ── Main screen ───────────────────────────────────────────────────────────────
 class BusinessDetailScreen extends StatefulWidget {
   final Business business;
-  const BusinessDetailScreen({super.key, required this.business});
+  /// Guided tour only: automatically adds items → opens cart → places a delivery order.
+  final bool investorDemoAutoPlaceOrder;
+
+  const BusinessDetailScreen({
+    super.key,
+    required this.business,
+    this.investorDemoAutoPlaceOrder = false,
+  });
 
   @override
   State<BusinessDetailScreen> createState() => _BusinessDetailScreenState();
@@ -246,6 +254,7 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen> {
   /// Starts as [BusinessDetailScreen.business]; menu rows load from API if empty.
   late Business _displayBiz;
   bool _remoteMenuLoading = false;
+  bool _demoFlowStarted = false;
 
   Business get biz => _displayBiz;
   Color get color => biz.color;
@@ -343,6 +352,116 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen> {
     }
   }
 
+  Future<void> _runInvestorDemoOrderFlow() async {
+    if (_demoFlowStarted) return;
+    _demoFlowStarted = true;
+    // Give the UI time to render the menu.
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
+
+    final cart = context.read<CartProvider>();
+    final b = biz;
+    // Add first 3 items (or fewer) so the viewer sees quantity controls.
+    final items = b.items.take(3).toList(growable: false);
+    for (final it in items) {
+      cart.addItem(businessId: b.id, itemId: it.id, quantity: 1);
+      await Future<void>.delayed(const Duration(milliseconds: 380));
+      if (!mounted) return;
+    }
+    setState(() {
+      _deliverySelected = b.hasDelivery;
+      _orderNoteCtrl.text = 'Investor demo order — please call on arrival.';
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    _showCartSummary();
+
+    // Place order without confirmation dialog (demo only).
+    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    if (!mounted) return;
+    await _placeOrderWithoutDialog();
+  }
+
+  Future<void> _placeOrderWithoutDialog() async {
+    // This mirrors _confirmAndPlaceOrder() but skips the confirmation dialog.
+    final deliverySelected = _deliverySelected;
+    final authProv = context.read<AuthProvider>();
+    final orderProv = context.read<OrderProvider>();
+    final cartProv = context.read<CartProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    final bizTypeName = BusinessType.all
+        .firstWhere((t) => t.id == biz.businessTypeId,
+            orElse: () => BusinessType(
+                  id: biz.businessTypeId,
+                  title: biz.businessTypeId,
+                  icon: Icons.store,
+                  imageUrl: '',
+                  categories: [],
+                  color: color,
+                ))
+        .title;
+
+    final phone = authProv.userEmail ?? '0300-0000000';
+    final optionalNote = _orderNoteCtrl.text.trim();
+    final baseNote = deliverySelected
+        ? 'Delivery • ${_deliveryDistanceKm.toStringAsFixed(1)} km'
+        : 'Pickup';
+    final newOrder = Order(
+      id: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
+      customerId: phone,
+      customerName: 'Customer',
+      customerPhone: phone,
+      customerAddress: deliverySelected ? 'Customer address (demo)' : null,
+      items: _cart.entries.map((e) {
+        final it = biz.items.firstWhere((i) => i.id == e.key);
+        return OrderItem(
+          productId: it.id,
+          productName: it.name,
+          quantity: e.value,
+          unitPrice: it.price,
+        );
+      }).toList(),
+      status: OrderStatus.pending,
+      notes: optionalNote.isNotEmpty ? '$baseNote • $optionalNote' : baseNote,
+      businessTypeId: biz.businessTypeId,
+      businessTypeName: bizTypeName,
+      deliveryCharge: deliverySelected ? _deliveryFee : 0,
+      isDelivery: deliverySelected,
+      createdAt: DateTime.now(),
+    );
+    orderProv.addOrder(newOrder);
+    if (widget.investorDemoAutoPlaceOrder) {
+      InvestorDemoLastCheckout.placedOrderId = newOrder.id;
+    }
+
+    if (!mounted) return;
+    navigator.pop(); // close cart sheet
+    cartProv.clearBusinessCart(biz.id);
+    _orderNoteCtrl.clear();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white),
+          const SizedBox(width: 10),
+          Text(
+            deliverySelected
+                ? 'Order placed (demo)! Delivery on the way.'
+                : 'Order confirmed (demo)! Ready for pickup.',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ]),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -350,6 +469,17 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen> {
     if (widget.business.items.isEmpty) {
       _remoteMenuLoading = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadRemoteMenu());
+    }
+    if (widget.investorDemoAutoPlaceOrder) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Wait for remote menu (if any) then run the scripted cart → order flow.
+        if (!mounted) return;
+        if (widget.business.items.isEmpty) {
+          await Future<void>.delayed(const Duration(milliseconds: 700));
+        }
+        if (!mounted) return;
+        await _runInvestorDemoOrderFlow();
+      });
     }
   }
 
@@ -485,7 +615,7 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen> {
               builder: (ctx) {
                 return PopScope(
                   canPop: _selectedCategory == 'All',
-                  onPopInvoked: (didPop) {
+                  onPopInvokedWithResult: (didPop, _) {
                     if (didPop) return;
                     if (_selectedCategory == 'All') return;
                     setState(() => _selectedCategory = 'All');
@@ -511,7 +641,7 @@ class _BusinessDetailScreenState extends State<BusinessDetailScreen> {
         }
         return PopScope(
           canPop: _selectedCategory == 'All',
-          onPopInvoked: (didPop) {
+          onPopInvokedWithResult: (didPop, _) {
             if (didPop) return;
             if (_selectedCategory == 'All') return;
             setState(() => _selectedCategory = 'All');

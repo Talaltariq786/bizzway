@@ -43,6 +43,8 @@ dependencies:
   google_maps_flutter_android: ^2.19.6
   google_maps_flutter_platform_interface: ^2.15.0
   device_info_plus: ^11.0.0
+  webview_flutter: ^4.10.0
+  flutter_tts: ^4.2.3
 
 dev_dependencies:
   flutter_test:
@@ -53,5 +55,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/branding/
+    # branding/ (large PNG) hata di — launcher icons android/mipmap mein hain; APK chota.
     - docs/

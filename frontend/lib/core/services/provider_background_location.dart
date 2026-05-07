@@ -7,10 +7,18 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/dev_log.dart';
+import '../api/api_client.dart';
+import '../api/api_exception.dart';
+import '../api/location_api.dart';
+import '../config/api_config.dart';
+import '../config/offline_mode.dart';
 import '../../models/service_provider_profile.dart';
 import '../../providers/service_provider_directory_provider.dart';
 
 /// Background location updater for service providers.
+///
+/// Location **server par fixed nahi** rehti — har tick / live update se **lat/lng**
+/// refresh hoti hai (`POST /api/service-providers/me/location`) taake Near Me / radius sahi rahe.
 ///
 /// Reality:
 /// - Android: periodic background fetch is fairly reliable (still OS-dependent).
@@ -19,10 +27,15 @@ import '../../providers/service_provider_directory_provider.dart';
 class ProviderBackgroundLocation {
   ProviderBackgroundLocation._();
 
+  static const bool _isFlutterTest = bool.fromEnvironment('FLUTTER_TEST');
+
   static const String _kPrefsEnabled = 'provider_bg_location_enabled_v1';
   static const String _kPrefsLastLog = 'provider_bg_location_last_log_v1';
   static bool _initialized = false;
   static bool _available = false;
+  static ServiceProviderDirectoryProvider? _directory;
+  /// kDebugMode only: har 7s location print + (same as BG tick) local/API update.
+  static Timer? _debugSevenSecTimer;
 
   /// Call once during app startup.
   static Future<void> init({
@@ -30,6 +43,7 @@ class ProviderBackgroundLocation {
   }) async {
     if (_initialized) return;
     _initialized = true;
+    _directory = directory;
 
     devLog(
       '[BG] init called os=${Platform.operatingSystem} '
@@ -39,6 +53,7 @@ class ProviderBackgroundLocation {
     // background_fetch is only implemented on Android/iOS.
     if (kIsWeb || !(Platform.isAndroid || Platform.isIOS)) {
       devLog('[BG] background_fetch not supported on this platform');
+      _syncDebugSevenSecondTimer();
       return;
     }
 
@@ -80,6 +95,7 @@ class ProviderBackgroundLocation {
       // or the plugin throws (some versions assume different exception shapes).
       devLog('[BG] background_fetch configure failed', e);
       _available = false;
+      _syncDebugSevenSecondTimer();
       return;
     }
 
@@ -90,6 +106,7 @@ class ProviderBackgroundLocation {
     } catch (e) {
       devLog('[BG] registerHeadlessTask failed', e);
       _available = false;
+      _syncDebugSevenSecondTimer();
       return;
     }
 
@@ -107,8 +124,34 @@ class ProviderBackgroundLocation {
     } catch (e) {
       devLog('[BG] start/stop failed', e);
       _available = false;
+      _syncDebugSevenSecondTimer();
       return;
     }
+    _syncDebugSevenSecondTimer();
+  }
+
+  static void _syncDebugSevenSecondTimer() {
+    _debugSevenSecTimer?.cancel();
+    _debugSevenSecTimer = null;
+    if (_isFlutterTest) return;
+    if (!kDebugMode) return;
+    if (_directory == null) return;
+    SharedPreferences.getInstance().then((prefs) {
+      final enabled = prefs.getBool(_kPrefsEnabled) ?? false;
+      if (!enabled) {
+        devLog('[BG] debug 7s: stopped (location toggle off)');
+        return;
+      }
+      final d = _directory!;
+      _debugSevenSecTimer = Timer.periodic(const Duration(seconds: 7), (_) {
+        // ignore: discarded_futures
+        _tick(d);
+      });
+      devLog(
+        '[BG] DEBUG: har 7s ⏱ lat/lng + update — terminal/IDE console (flutter run). '
+        'App background = OS timer band bhi ho sakta hai.',
+      );
+    });
   }
 
   /// Enable/disable background updates. Call when provider toggles Online/Offline.
@@ -131,6 +174,7 @@ class ProviderBackgroundLocation {
     } catch (e) {
       devLog('[BG] start/stop failed', e);
     }
+    _syncDebugSevenSecondTimer();
   }
 
   static Future<void> _tick(ServiceProviderDirectoryProvider directory) async {
@@ -186,8 +230,30 @@ class ProviderBackgroundLocation {
         lng: pos.longitude,
         updatedAt: DateTime.now(),
         createdAt: current.createdAt,
+        scrapRatesDisplay: current.scrapRatesDisplay,
       ),
     );
+
+    if (!OfflineMode.enabled) {
+      try {
+        await LocationApi(ApiClient()).postServiceProviderLocation(
+          lat: pos.latitude,
+          lng: pos.longitude,
+        );
+      } catch (e, st) {
+        if (kDebugMode) {
+          final code = e is ApiException ? e.statusCode : null;
+          devLog('[BG] location API failed', e, st);
+          if (code == 401) {
+            devLog(
+              '[BG] 401 = is server par token verify nahi hua. '
+              'Login screen → "API:" wahi base URL set karo jahan se login / register hua '
+              '(localhost vs live alag JWT secret). Abhi baseUrl=${ApiConfig.baseUrl}',
+            );
+          }
+        }
+      }
+    }
 
     devLog('[BG] upserted provider=$providerId');
   }
@@ -217,16 +283,37 @@ class ProviderBackgroundLocation {
     // Low power is fine for “near me” radius.
     const settings = LocationSettings(
       accuracy: LocationAccuracy.low,
-      timeLimit: Duration(seconds: 12),
+      // iOS simulator / cold start GPS can take longer than 12s.
+      timeLimit: Duration(seconds: 20),
     );
-    return Geolocator.getCurrentPosition(locationSettings: settings);
+    try {
+      return await Geolocator.getCurrentPosition(locationSettings: settings);
+    } on TimeoutException catch (e, st) {
+      if (kDebugMode) {
+        devLog(
+          '[BG] getCurrentPosition timeout (20s). Trying lastKnownPosition. '
+          'Tip: iOS simulator → Features → Location → select a location.',
+          e,
+          st,
+        );
+      }
+      try {
+        return await Geolocator.getLastKnownPosition();
+      } catch (e2, st2) {
+        if (kDebugMode) devLog('[BG] getLastKnownPosition failed', e2, st2);
+        return null;
+      }
+    } catch (e, st) {
+      if (kDebugMode) devLog('[BG] getCurrentPosition failed', e, st);
+      return null;
+    }
   }
 
   /// Headless task entry (Android only). We can't access providers here in a
   /// reliable way without building a full headless isolate wiring.
   /// For now, it just finishes; periodic ticks run while the app has been opened at least once.
-  static Future<void> _headlessTask(HeadlessTask task) async {
-    BackgroundFetch.finish(task.taskId);
+  static Future<void> _headlessTask(HeadlessEvent event) async {
+    BackgroundFetch.finish(event.taskId);
   }
 }
 
